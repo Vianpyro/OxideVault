@@ -1,13 +1,33 @@
 {
-    "name": "Template Development Container",
-    "dockerFile": "Dockerfile",
+    "name": "Rust Alpine",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
     "customizations": {
-        "settings": {
-            "terminal.integrated.shell.linux": "/bin/bash"
-        },
         "vscode": {
-            "extensions": ["esbenp.prettier-vscode"]
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "vadimcn.vscode-lldb",
+                "tamasfe.even-better-toml",
+                "fill-labs.dependi"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "[rust]": {
+                    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+                }
+            }
         }
     },
-    "remoteUser": "vscode"
+    "postCreateCommand": "rustc --version && cargo --version",
+    "remoteUser": "vscode",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "upgradePackages": true,
+            "username": "vscode",
+            "uid": "1000",
+            "gid": "1000"
+        },
+        "ghcr.io/devcontainers/features/git:1": {}
+    }
 }
