@@ -1,0 +1,39 @@
+name: Normalize Repository Name
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      name:
+        description: 'Lowercased repository name (owner/name)'
+        value: ${{ jobs.build.outputs.name }}
+      owner:
+        description: 'Lowercased repository owner'
+        value: ${{ jobs.build.outputs.owner }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Normalize Repository Name
+    runs-on: ubuntu-latest
+
+    outputs:
+      name: ${{ steps.repo_name.outputs.name }}
+      owner: ${{ steps.repo_name.outputs.owner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Normalize repository owner and name
+        id: repository_normalized
+        run: |
+          echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Extract repository owner and name
+        id: repo_name
+        run: |
+          echo "owner=$(echo '${{ steps.repository_normalized.outputs.name }}' | cut -d'/' -f1)" | tee -a "$GITHUB_OUTPUT"
+          echo "name=$(echo '${{ steps.repository_normalized.outputs.name }}' | cut -d'/' -f2)" | tee -a "$GITHUB_OUTPUT"
