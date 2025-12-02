@@ -17,6 +17,46 @@
             "runOptions": {
                 "runOn": "folderOpen"
             }
+        },
+        {
+            "label": "Update cargo",
+            "type": "shell",
+            "command": "cargo update",
+            "problemMatcher": [],
+            "presentation": {
+                "close": true
+            },
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
+        },
+        {
+            "label": "Clean old builds",
+            "type": "shell",
+            "command": "cargo clean",
+            "problemMatcher": [],
+            "presentation": {
+                "close": true
+            },
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
+        },
+        {
+            "label": "Build Project",
+            "type": "shell",
+            "command": "cargo build",
+            "problemMatcher": [],
+            "presentation": {
+                "close": true
+            },
+            "runOptions": {
+                "runOn": "folderOpen"
+            },
+            "dependsOn": [
+                "Update cargo",
+                "Clean old builds"
+            ]
         }
     ]
 }
