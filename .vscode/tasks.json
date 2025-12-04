@@ -25,9 +25,6 @@
             "problemMatcher": [],
             "presentation": {
                 "close": true
-            },
-            "runOptions": {
-                "runOn": "folderOpen"
             }
         },
         {
@@ -37,9 +34,6 @@
             "problemMatcher": [],
             "presentation": {
                 "close": true
-            },
-            "runOptions": {
-                "runOn": "folderOpen"
             }
         },
         {
@@ -49,9 +43,6 @@
             "problemMatcher": [],
             "presentation": {
                 "close": true
-            },
-            "runOptions": {
-                "runOn": "folderOpen"
             },
             "dependsOn": ["Update cargo", "Clean old builds"]
         }
