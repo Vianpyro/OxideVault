@@ -1,5 +1,5 @@
 use crate::types::Data;
-use crate::commands::{ping, uuid, link};
+use crate::commands::{ping, uuid};
 use crate::db;
 use poise::serenity_prelude as serenity;
 use dotenv::dotenv;
@@ -23,7 +23,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![ping(), uuid(), link()],
+            commands: vec![ping(), uuid()],
             ..Default::default()
         })
         .setup(move |context, _ready, framework| {
