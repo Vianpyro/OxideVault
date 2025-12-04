@@ -38,7 +38,7 @@ jobs:
           # - slug: 3-50 chars, lowercase letters or digits, may include '-' or '_' inside
           #   but MUST start and end with an alphanumeric character (no leading/trailing -/_)
           # Examples: feature/add_something, bug/fix-login-issue, docs/update-readme
-          PATTERN='^(feature|bug|fix|chore|docs|test|testing|performance|refactor|ci\-cd|build|release|hotfix|experiment|task|security|special|status)\/[a-z0-9][a-z0-9_-]{1,48}[a-z0-9]$'
+          PATTERN='^(copilot|feature|bug|fix|chore|docs|test|testing|performance|refactor|ci\-cd|build|release|hotfix|experiment|task|security|special|status)\/[a-z0-9][a-z0-9_-]{1,48}[a-z0-9]$'
 
           if [[ "$BRANCH_NAME" =~ $PATTERN ]]; then
             echo "✅ Branch name is valid: $BRANCH_NAME"
