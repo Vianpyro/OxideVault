@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection};
 use std::error::Error;
 
 fn init_db_sync(path: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
