@@ -13,9 +13,6 @@
             "problemMatcher": [],
             "presentation": {
                 "close": true
-            },
-            "runOptions": {
-                "runOn": "folderOpen"
             }
         },
         {
