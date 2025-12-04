@@ -53,10 +53,7 @@
             "runOptions": {
                 "runOn": "folderOpen"
             },
-            "dependsOn": [
-                "Update cargo",
-                "Clean old builds"
-            ]
+            "dependsOn": ["Update cargo", "Clean old builds"]
         }
     ]
 }
