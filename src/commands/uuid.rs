@@ -18,17 +18,23 @@ pub async fn uuid(
 
     context.defer().await?;
 
-    match mojang::fetch_profile(&name).await {
+    match mojang::fetch_profile(&context.data().http_client, &name).await {
         Ok(Some(profile)) => {
             let uuid = &profile.id;
-            let formatted_uuid = format!(
-                "{}-{}-{}-{}-{}",
-                &uuid[0..8], &uuid[8..12], &uuid[12..16], &uuid[16..20], &uuid[20..32]
-            );
+            if uuid.len() == 32 {
+                let formatted_uuid = format!(
+                    "{}-{}-{}-{}-{}",
+                    &uuid[0..8], &uuid[8..12], &uuid[12..16], &uuid[16..20], &uuid[20..32]
+                );
 
-            context
-                .say(format!("✅ **Player:** {}\n**UUID:** `{}`", profile.name, formatted_uuid))
-                .await?;
+                context
+                    .say(format!("✅ **Player:** {}\n**UUID:** `{}`", profile.name, formatted_uuid))
+                    .await?;
+            } else {
+                context
+                    .say("❌ Unexpected UUID format returned from Mojang API.")
+                    .await?;
+            }
         }
         Ok(None) => {
             context

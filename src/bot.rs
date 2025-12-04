@@ -11,7 +11,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let token = match env::var("DISCORD_TOKEN") {
         Ok(t) => t,
         Err(_) => {
-            return Err("Missing DISCORD_TOKEN environment variable. Provide it via environment or a .env file containing DISCORD_TOKEN=...".into());
+            return Err("Missing DISCORD_TOKEN environment variable. Set it in your environment or create a .env file (never commit this file).".into());
         }
     };
 
@@ -21,6 +21,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Initialize DB (creates file and tables if needed)
     db::init_db(&db_path).await?;
 
+    // Create HTTP client for API requests (reused across requests for better performance)
+    let http_client = reqwest::Client::new();
+
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![ping(), uuid()],
@@ -28,9 +31,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         })
         .setup(move |context, _ready, framework| {
             let db_path = db_path.clone();
+            let http_client = http_client.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(context, &framework.options().commands).await?;
-                Ok(Data { db_path })
+                Ok(Data { db_path, http_client })
             })
         })
         .build();

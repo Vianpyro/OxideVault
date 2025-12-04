@@ -6,9 +6,8 @@ pub struct MojangProfile {
     pub name: String,
 }
 
-pub async fn fetch_profile(name: &str) -> Result<Option<MojangProfile>, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn fetch_profile(client: &reqwest::Client, name: &str) -> Result<Option<MojangProfile>, Box<dyn std::error::Error + Send + Sync>> {
     let url = format!("https://api.mojang.com/users/profiles/minecraft/{}", name);
-    let client = reqwest::Client::new();
     let resp = client.get(&url).send().await?;
 
     if resp.status().is_success() {
