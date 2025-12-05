@@ -2,7 +2,7 @@ use crate::types::{Context, Error};
 use crate::mc_server;
 
 #[poise::command(slash_command)]
-/// Check the status and online players of the Minecraft server
+// Check the status and online players of the Minecraft server
 pub async fn online(
     context: Context<'_>,
 ) -> Result<(), Error> {

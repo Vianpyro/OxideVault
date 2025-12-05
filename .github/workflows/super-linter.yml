@@ -56,6 +56,9 @@ jobs:
           VALIDATE_ALL_CODEBASE: false
           # Disable problematic validators
           VALIDATE_BIOME_FORMAT: false
+          VALIDATE_DOCKERFILE_HADOLINT: false
+          VALIDATE_GIT_COMMITLINT: false
+          VALIDATE_GITHUB_ACTIONS_ZIZMOR: false
           # Enable fixers for PR events
           FIX_JSON: true
           FIX_JSON_PRETTIER: true

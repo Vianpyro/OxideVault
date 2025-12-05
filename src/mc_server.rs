@@ -46,7 +46,7 @@ impl Description {
     }
 }
 
-/// Ping a Minecraft server and retrieve its status
+// Ping a Minecraft server and retrieve its status
 pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Error + Send + Sync>> {
     let mut stream = TcpStream::connect(address)?;
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
@@ -117,22 +117,31 @@ fn write_varint(buf: &mut Vec<u8>, mut value: i32) -> std::io::Result<()> {
     Ok(())
 }
 
+// Process a VarInt byte and update the result and shift values
+// Returns Ok(true) if VarInt is complete, Ok(false) if more bytes needed
+fn process_varint_byte(byte: u8, result: &mut i32, shift: &mut i32) -> std::io::Result<bool> {
+    *result |= ((byte & 0x7F) as i32) << *shift;
+    if byte & 0x80 == 0 {
+        return Ok(true);
+    }
+    *shift += 7;
+    if *shift >= 35 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "VarInt is too big",
+        ));
+    }
+    Ok(false)
+}
+
 fn read_varint(stream: &mut TcpStream) -> std::io::Result<i32> {
     let mut result = 0;
     let mut shift = 0;
     loop {
         let mut byte = [0u8; 1];
         stream.read_exact(&mut byte)?;
-        result |= ((byte[0] & 0x7F) as i32) << shift;
-        if byte[0] & 0x80 == 0 {
+        if process_varint_byte(byte[0], &mut result, &mut shift)? {
             break;
-        }
-        shift += 7;
-        if shift >= 35 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "VarInt is too big",
-            ));
         }
     }
     Ok(result)
@@ -168,17 +177,9 @@ fn read_varint_from_slice(data: &[u8]) -> std::io::Result<(i32, usize)> {
             ));
         }
         let byte = data[pos];
-        result |= ((byte & 0x7F) as i32) << shift;
         pos += 1;
-        if byte & 0x80 == 0 {
+        if process_varint_byte(byte, &mut result, &mut shift)? {
             break;
-        }
-        shift += 7;
-        if shift >= 35 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "VarInt is too big",
-            ));
         }
     }
     Ok((result, pos))
