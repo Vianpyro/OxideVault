@@ -58,18 +58,25 @@ pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Er
     write_varint(&mut handshake, -1)?; // Protocol version (-1 for auto-detection)
 
     // Extract host and port from address (supports IPv6 with brackets, e.g., "[::1]:25565")
-    let (host, port) = if let Some(last_colon) = address.rfind(':') {
-        // Check if this is an IPv6 address in brackets
-        if address.starts_with('[') {
-            if let Some(bracket_end) = address.find(']') {
-                let ipv6_host = &address[1..bracket_end];
-                let port_str = address.get(bracket_end + 2..).unwrap_or("25565");
+    let (host, port) = if address.starts_with('[') {
+        // IPv6 address in brackets format: [host]:port or [host]
+        if let Some(bracket_end) = address.find(']') {
+            let ipv6_host = &address[1..bracket_end];
+            // Check if there's a port after the closing bracket
+            if address.len() > bracket_end + 1 && address.as_bytes().get(bracket_end + 1) == Some(&b':') {
+                let port_str = &address[bracket_end + 2..];
                 (ipv6_host, port_str.parse::<u16>().unwrap_or(25565))
             } else {
-                (address, 25565)
+                (ipv6_host, 25565)
             }
-        } else if address[..last_colon].contains(':') {
-            // IPv6 address without brackets and no port
+        } else {
+            // Malformed address - missing closing bracket
+            (address, 25565)
+        }
+    } else if let Some(last_colon) = address.rfind(':') {
+        // Check if there are other colons before this one (indicates IPv6 without brackets)
+        if address[..last_colon].contains(':') {
+            // IPv6 address without brackets - use entire address as host
             (address, 25565)
         } else {
             // IPv4 address or hostname with port
@@ -78,6 +85,7 @@ pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Er
             (host, port_str.parse::<u16>().unwrap_or(25565))
         }
     } else {
+        // No port specified
         (address, 25565)
     };
 

@@ -8,9 +8,10 @@ fn init_db_sync(path: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     conn.execute("PRAGMA foreign_keys = ON", [])?;
 
     // Minecraft users table - primary source of truth
+    // Note: PRIMARY KEY implies uniqueness, so no UNIQUE constraint is needed
     conn.execute(
         "CREATE TABLE IF NOT EXISTS minecraft_users (
-            mc_uuid TEXT NOT NULL UNIQUE PRIMARY KEY,
+            mc_uuid TEXT NOT NULL PRIMARY KEY,
             mc_username TEXT NOT NULL
         )",
         [],
