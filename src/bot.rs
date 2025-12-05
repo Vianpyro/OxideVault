@@ -17,7 +17,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let intents = serenity::GatewayIntents::non_privileged();
 
-    let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| "oxidevault.db".to_string());
+    let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| "/data/oxidevault.db".to_string());
     // Initialize DB (creates file and tables if needed)
     db::init_db(&db_path).await?;
 
