@@ -1,0 +1,213 @@
+name: Create Release on PR Merge
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml' # Trigger only on version changes since a workflow verifies version bumps
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Bot Binaries
+    uses: ./.github/workflows/build-binary.yml
+    secrets: inherit
+
+  publish_image:
+    name: Build & Publish Docker Image (GHCR)
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.name }}-ubuntu-latest
+          path: dist/${{ needs.build.outputs.name }}-ubuntu-latest
+
+      - name: Get package name
+        id: get_name
+        run: |
+          NAME='${{ needs.build.outputs.name }}'
+          echo "name=$NAME" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Get version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep '^version =' Cargo.toml | head -n 1 | cut -d '"' -f 2)
+          echo "version=$VERSION" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Locate binary
+        id: locate
+        run: |
+          REPO_NAME="${{ steps.get_name.outputs.name }}"
+
+          # Prefer crate name from Cargo.toml if present
+          CARGO_NAME=""
+          if [[ -f Cargo.toml ]]; then
+            CARGO_NAME=$(grep '^name\s*=\s*"' Cargo.toml | head -n1 | cut -d '"' -f2 || true)
+          fi
+          if [[ -n "$CARGO_NAME" ]]; then
+            NAME="$CARGO_NAME"
+          else
+            NAME="$REPO_NAME"
+          fi
+
+          # Capitalize first character (leave rest as-is)
+          FIRST="${NAME:0:1}"
+          REST="${NAME:1}"
+          FIRST_UP=$(tr '[:lower:]' '[:upper:]' <<< "$FIRST")
+          CAPITALIZED="$FIRST_UP$REST"
+
+          SEARCH_DIR="dist/${REPO_NAME}-ubuntu-latest"
+          if [[ ! -d "$SEARCH_DIR" ]]; then
+            echo "Expected artifact directory '$SEARCH_DIR' not found" >&2
+            ls -la dist || true
+            exit 1
+          fi
+
+          # Collect candidate files (regular files) in the artifact dir
+          mapfile -t CANDIDATES < <(find "$SEARCH_DIR" -maxdepth 1 -type f -print)
+
+          if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
+            echo "No files found in $SEARCH_DIR" >&2
+            ls -la "$SEARCH_DIR" || true
+            exit 1
+          fi
+
+          # Prefer exact name match, then capitalized, otherwise choose largest file
+          SELECTED=""
+          for f in "${CANDIDATES[@]}"; do
+            base=$(basename "$f")
+            if [[ "$base" == "$NAME" || "$base" == "$CAPITALIZED" ]]; then
+              SELECTED="$f"
+              break
+            fi
+          done
+
+          if [[ -z "$SELECTED" ]]; then
+            # pick largest file as a sensible default (likely the binary)
+            SELECTED=$(for f in "${CANDIDATES[@]}"; do stat -c "%s %n" "$f"; done | sort -nr | head -n1 | cut -d' ' -f2-)
+          fi
+
+          if [[ -z "$SELECTED" ]]; then
+            echo "Failed to select a binary in $SEARCH_DIR" >&2
+            ls -la "$SEARCH_DIR" || true
+            exit 1
+          fi
+
+          echo "binary=$SELECTED" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ needs.build.outputs.owner }}/${{ steps.get_name.outputs.name }}:v${{ steps.get_version.outputs.version }}
+            ghcr.io/${{ needs.build.outputs.owner }}/${{ steps.get_name.outputs.name }}:latest
+          build-args: |
+            BINARY=${{ steps.locate.outputs.binary }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create_release:
+    name: Create Release and Upload Assets
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download build artifacts (Linux)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.name }}-ubuntu-latest
+          path: dist/${{ needs.build.outputs.name }}-ubuntu-latest
+
+      - name: Download build artifacts (Windows)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.name }}-windows-latest
+          path: dist/${{ needs.build.outputs.name }}-windows-latest
+
+      - name: Download build artifacts (macOS)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.name }}-macos-latest
+          path: dist/${{ needs.build.outputs.name }}-macos-latest
+
+      - name: Rename and flatten binaries
+        run: |
+          NAME='${{ needs.build.outputs.name }}'
+          # Capitalize first character
+          FIRST="${NAME:0:1}"
+          REST="${NAME:1}"
+          FIRST_UP="$(tr '[:lower:]' '[:upper:]' <<< "$FIRST")"
+          CAPITALIZED="$FIRST_UP$REST"
+
+          # Linux
+          if [[ -f "dist/${{ needs.build.outputs.name }}-ubuntu-latest/${NAME}" ]]; then
+            cp "dist/${{ needs.build.outputs.name }}-ubuntu-latest/${NAME}" "dist/${NAME}-linux"
+          elif [[ -f "dist/${{ needs.build.outputs.name }}-ubuntu-latest/${CAPITALIZED}" ]]; then
+            cp "dist/${{ needs.build.outputs.name }}-ubuntu-latest/${CAPITALIZED}" "dist/${NAME}-linux"
+          fi
+
+          # macOS
+          if [[ -f "dist/${{ needs.build.outputs.name }}-macos-latest/${NAME}" ]]; then
+            cp "dist/${{ needs.build.outputs.name }}-macos-latest/${NAME}" "dist/${NAME}-macos"
+          elif [[ -f "dist/${{ needs.build.outputs.name }}-macos-latest/${CAPITALIZED}" ]]; then
+            cp "dist/${{ needs.build.outputs.name }}-macos-latest/${CAPITALIZED}" "dist/${NAME}-macos"
+          fi
+
+          # Windows
+          if [[ -f "dist/${{ needs.build.outputs.name }}-windows-latest/${NAME}.exe" ]]; then
+            cp "dist/${{ needs.build.outputs.name }}-windows-latest/${NAME}.exe" "dist/${NAME}-windows.exe"
+          elif [[ -f "dist/${{ needs.build.outputs.name }}-windows-latest/${CAPITALIZED}.exe" ]]; then
+            cp "dist/${{ needs.build.outputs.name }}-windows-latest/${CAPITALIZED}.exe" "dist/${NAME}-windows.exe"
+          fi
+
+      - name: Retrieve version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep '^version =' Cargo.toml | head -n 1 | cut -d '"' -f 2)
+          echo "version=$VERSION" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release and upload assets
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: 'Version ${{ steps.get_version.outputs.version }}'
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
+          files: |
+            dist/${{ needs.build.outputs.name }}-linux
+            dist/${{ needs.build.outputs.name }}-macos
+            dist/${{ needs.build.outputs.name }}-windows.exe
