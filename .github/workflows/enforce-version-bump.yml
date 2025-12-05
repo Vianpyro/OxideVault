@@ -38,5 +38,6 @@ jobs:
       - name: Compare versions
         run: |
           if [ "${{ steps.get_version.outputs.version }}" = "${{ steps.get_previous_version.outputs.previous_version }}" ]; then
+            echo "Error: The version in Cargo.toml has not been bumped. Please update the version in Cargo.toml when changing Rust source files."
             exit 1
           fi

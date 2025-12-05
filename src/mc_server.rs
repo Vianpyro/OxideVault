@@ -55,13 +55,37 @@ pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Er
     // Build handshake packet
     let mut handshake = Vec::new();
     write_varint(&mut handshake, 0)?; // Packet ID: handshake
-    write_varint(&mut handshake, 47)?; // Protocol version (1.8+)
+    write_varint(&mut handshake, -1)?; // Protocol version (-1 for auto-detection)
 
-    // Extract host and port from address
-    let (host, port) = if address.contains(':') {
-        let parts: Vec<&str> = address.split(':').collect();
-        (parts[0], parts.get(1).and_then(|p| p.parse::<u16>().ok()).unwrap_or(25565))
+    // Extract host and port from address (supports IPv6 with brackets, e.g., "[::1]:25565")
+    let (host, port) = if address.starts_with('[') {
+        // IPv6 address in brackets format: [host]:port or [host]
+        if let Some(bracket_end) = address.find(']') {
+            let ipv6_host = &address[1..bracket_end];
+            // Check if there's a port after the closing bracket
+            if address.len() > bracket_end + 1 && address.as_bytes().get(bracket_end + 1) == Some(&b':') {
+                let port_str = &address[bracket_end + 2..];
+                (ipv6_host, port_str.parse::<u16>().unwrap_or(25565))
+            } else {
+                (ipv6_host, 25565)
+            }
+        } else {
+            // Malformed address - missing closing bracket
+            (address, 25565)
+        }
+    } else if let Some(last_colon) = address.rfind(':') {
+        // Check if there are other colons before this one (indicates IPv6 without brackets)
+        if address[..last_colon].contains(':') {
+            // IPv6 address without brackets - use entire address as host
+            (address, 25565)
+        } else {
+            // IPv4 address or hostname with port
+            let host = &address[..last_colon];
+            let port_str = &address[last_colon + 1..];
+            (host, port_str.parse::<u16>().unwrap_or(25565))
+        }
     } else {
+        // No port specified
         (address, 25565)
     };
 

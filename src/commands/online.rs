@@ -20,9 +20,9 @@ pub async fn online(
     match result {
         Ok(Ok(status)) => {
             let player_list = if !status.players.sample.is_empty() {
-                let players: Vec<String> = status.players.sample
+                let players: Vec<&str> = status.players.sample
                     .iter()
-                    .map(|p| p.name.clone())
+                    .map(|p| p.name.as_str())
                     .collect();
                 format!("\n**Players online:** {}", players.join(", "))
             } else {
