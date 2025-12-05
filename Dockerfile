@@ -5,7 +5,9 @@ RUN apt-get update \
 		&& apt-get install -y --no-install-recommends ca-certificates adduser \
 		&& rm -rf /var/lib/apt/lists/*
 
-ARG BINARY=target/release/OxideVault
+# NOTE: This Dockerfile expects a pre-built binary at the specified path.
+# Ensure you run `cargo build --release` before building this image.
+ARG BINARY=target/release/oxidevault
 COPY ${BINARY} /usr/local/bin/oxidevault
 RUN chmod +x /usr/local/bin/oxidevault
 
@@ -14,8 +16,9 @@ RUN addgroup --system app \
 		&& adduser --system --ingroup app app \
 		&& chown app:app /usr/local/bin/oxidevault
 
-# Simple HEALTHCHECK so scanners (e.g. Checkov) detect a healthprobe.
-# This uses the shell builtin `test` to ensure the binary is executable.
+# Note: This HEALTHCHECK only verifies that the binary is executable, not that the
+# Discord bot is connected or responsive. Consider implementing a proper health
+# endpoint in the application for more meaningful monitoring.
 HEALTHCHECK --interval=30s --timeout=3s \
 	CMD /bin/sh -c "test -x /usr/local/bin/oxidevault || exit 1"
 

@@ -10,9 +10,15 @@ fn init_db_sync(path: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Minecraft users table - primary source of truth
     conn.execute(
         "CREATE TABLE IF NOT EXISTS minecraft_users (
-            mc_uuid TEXT PRIMARY KEY,
+            mc_uuid TEXT NOT NULL UNIQUE PRIMARY KEY,
             mc_username TEXT NOT NULL
         )",
+        [],
+    )?;
+
+    // Add index on mc_username for faster lookups
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mc_username ON minecraft_users(mc_username)",
         [],
     )?;
 
