@@ -1,0 +1,109 @@
+name: Release Build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      name:
+        description: 'Lowercased repository name'
+        value: ${{ jobs.get-name.outputs.name }}
+      owner:
+        description: 'Lowercased repository owner'
+        value: ${{ jobs.get-name.outputs.owner }}
+
+permissions:
+  contents: read
+
+jobs:
+  get-name:
+    name: Get future binary name
+    uses: ./.github/workflows/normalize-repository-name.yml
+    secrets: inherit
+
+  build:
+    name: Build Binaries
+    needs: get-name
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Copy binary (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          repo_name='${{ needs.get-name.outputs.name }}'
+          if [ -f Cargo.toml ]; then
+            CARGO_NAME=$(grep '^name\s*=\s*"' Cargo.toml | head -n1 | cut -d '"' -f2 || true)
+          fi
+          if [ -n "$CARGO_NAME" ]; then
+            NAME="$CARGO_NAME"
+          else
+            NAME="$repo_name"
+          fi
+
+          # Capitalize first character (leave rest as-is)
+          first="${NAME:0:1}"
+          rest="${NAME:1}"
+          first_up="$(tr '[:lower:]' '[:upper:]' <<< "$first")"
+          capitalized_name="$first_up$rest"
+
+          if [ -f "target/release/$NAME" ]; then
+            cp "target/release/$NAME" dist/
+          elif [ -f "target/release/$capitalized_name" ]; then
+            cp "target/release/$capitalized_name" dist/
+          else
+            echo "No release binary found for '$NAME' or '$capitalized_name' in target/release"
+            ls -la target/release || true
+          fi
+        shell: bash
+
+      - name: Copy binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -Force dist
+          $repo_name = '${{ needs.get-name.outputs.name }}'
+          $cargo_name = ''
+          if (Test-Path -Path Cargo.toml) {
+            $line = Select-String -Path Cargo.toml -Pattern '^name\s*=\s*"' -SimpleMatch | Select-Object -First 1
+            if ($line) {
+              $m = ($line -split '"')
+              if ($m.Length -ge 2) { $cargo_name = $m[1] }
+            }
+          }
+          if ($cargo_name -and $cargo_name.Length -gt 0) { $name = $cargo_name } else { $name = $repo_name }
+
+          if ($name.Length -ge 1) {
+            $capitalized_name = $name.Substring(0,1).ToUpper() + $name.Substring(1)
+          } else {
+            $capitalized_name = $name
+          }
+
+          if (Test-Path "target\release\$name.exe") {
+            Copy-Item "target\release\$name.exe" dist\ -Force
+          } elseif (Test-Path "target\release\$capitalized_name.exe") {
+            Copy-Item "target\release\$capitalized_name.exe" dist\ -Force
+          } else {
+            Write-Host "No release binary found for '$name' or '$capitalized_name' in target\release"
+            Get-ChildItem -Path target\release -Force | Format-List -Property Name,Length
+          }
+        shell: pwsh
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.get-name.outputs.name }}-${{ matrix.os }}
+          path: dist/

@@ -1,0 +1,42 @@
+name: Enforce version bump
+
+on:
+  pull_request:
+    paths:
+      - '**/*.rs'
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  enforce-version-bump:
+    name: Enforce version bump
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Retrieve version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep '^version =' Cargo.toml | head -n 1 | cut -d '"' -f 2)
+          echo "version=$VERSION" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Fetch default branch
+        run: git fetch origin main --depth=1
+
+      - name: Get previous version from default branch
+        id: get_previous_version
+        run: |
+          PREV_VERSION=$(git show origin/main:Cargo.toml | grep '^version =' | head -n 1 | cut -d '"' -f 2)
+          echo "previous_version=$PREV_VERSION" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Compare versions
+        run: |
+          if [ "${{ steps.get_version.outputs.version }}" = "${{ steps.get_previous_version.outputs.previous_version }}" ]; then
+            exit 1
+          fi
