@@ -1,6 +1,6 @@
 mod types;
 mod mojang;
-mod db;
+mod database;
 mod commands;
 mod bot;
 mod mc_server;

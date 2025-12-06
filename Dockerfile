@@ -1,7 +1,15 @@
 FROM rust:1-bookworm as builder
 
 WORKDIR /build
+
+# Layer caching
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm -rf src
+
 COPY . .
+RUN touch src/main.rs  # Force rebuild of main crate only
 RUN cargo build --release
 
 FROM debian:bookworm-slim
