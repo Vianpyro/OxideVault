@@ -18,12 +18,25 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let intents = serenity::GatewayIntents::non_privileged();
 
     // Use DB_PATH if set, otherwise default to ./data/oxidevault.db in current directory
-    let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| {
-        let mut path = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        path.push("data");
-        path.push("oxidevault.db");
-        path.to_string_lossy().to_string()
-    });
+    let db_path = match std::env::var("DB_PATH") {
+        Ok(val) => val,
+        Err(_) => {
+            let mut path = match std::env::current_dir() {
+                Ok(p) => p,
+                Err(e) => {
+                    return Err(format!("Failed to determine current directory: {}", e).into());
+                }
+            };
+            path.push("data");
+            path.push("oxidevault.db");
+            match path.into_os_string().into_string() {
+                Ok(s) => s,
+                Err(os_str) => {
+                    return Err(format!("Database path contains invalid Unicode: {:?}", os_str).into());
+                }
+            }
+        }
+    };
 
     // Initialize DB (creates file and tables if needed)
     database::init_db(&db_path).await?;
