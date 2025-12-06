@@ -1,7 +1,13 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, Result};
 use std::error::Error;
+use std::path::Path;
 
 fn init_db_sync(path: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = Path::new(path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
     let conn = Connection::open(path)?;
 
     // Enable foreign keys
