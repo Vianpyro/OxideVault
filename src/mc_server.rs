@@ -48,15 +48,24 @@ impl Description {
 
 // Ping a Minecraft server and retrieve its status
 pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Error + Send + Sync>> {
+    eprintln!("🔍 [DEBUG] Starting ping_server for address: {}", address);
+
     // Resolve address and connect with timeout
+    eprintln!("🔍 [DEBUG] Resolving address...");
     let mut addrs = address.to_socket_addrs()?;
     let addr = addrs.next().ok_or("Could not resolve address")?;
+    eprintln!("✅ [DEBUG] Resolved to: {}", addr);
 
-    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(5))?;
-    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+    eprintln!("🔍 [DEBUG] Attempting TCP connection with 10s timeout...");
+    let start = std::time::Instant::now();
+    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(10))?;
+    eprintln!("✅ [DEBUG] Connected in {:?}", start.elapsed());
+
+    stream.set_read_timeout(Some(Duration::from_secs(10)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(10)))?;
 
     // Build handshake packet
+    eprintln!("🔍 [DEBUG] Building handshake packet...");
     let mut handshake = Vec::new();
     write_varint(&mut handshake, 0)?; // Packet ID: handshake
     write_varint(&mut handshake, -1)?; // Protocol version (-1 for auto-detection)
@@ -75,19 +84,28 @@ pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Er
     write_varint(&mut handshake, 1)?; // Next state: status
 
     // Send handshake
+    eprintln!("🔍 [DEBUG] Sending handshake packet...");
     send_packet(&mut stream, &handshake)?;
+    eprintln!("✅ [DEBUG] Handshake sent");
 
     // Send status request
+    eprintln!("🔍 [DEBUG] Sending status request...");
     let mut status_request = Vec::new();
     write_varint(&mut status_request, 0)?; // Packet ID: request
     send_packet(&mut stream, &status_request)?;
+    eprintln!("✅ [DEBUG] Status request sent");
 
     // Read response
+    eprintln!("🔍 [DEBUG] Waiting for response...");
     let response = read_packet(&mut stream)?;
+    eprintln!("✅ [DEBUG] Received response of {} bytes", response.len());
+
     let json_str = read_string(&response[1..])?;
+    eprintln!("🔍 [DEBUG] JSON response length: {} chars", json_str.len());
 
     // Parse JSON response
     let status: ServerStatus = serde_json::from_str(&json_str)?;
+    eprintln!("✅ [DEBUG] Successfully parsed server status");
 
     Ok(status)
 }
