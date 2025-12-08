@@ -70,16 +70,13 @@ pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Er
     write_varint(&mut handshake, 0)?; // Packet ID: handshake
     write_varint(&mut handshake, -1)?; // Protocol version (-1 for auto-detection)
 
-    // Extract host and port from address
-    let (host, port) = if let Some(colon_pos) = address.rfind(':') {
-        let host = &address[..colon_pos];
-        let port_str = &address[colon_pos + 1..];
-        (host, port_str.parse::<u16>().unwrap_or(25565))
-    } else {
-        (address, 25565)
-    };
+    // Use the resolved IP address and port
+    let host_str = addr.ip().to_string();
+    let port = addr.port();
 
-    write_string(&mut handshake, host)?;
+    eprintln!("🔍 [DEBUG] Using host: {} port: {}", host_str, port);
+
+    write_string(&mut handshake, &host_str)?;
     handshake.write_all(&port.to_be_bytes())?; // Port
     write_varint(&mut handshake, 1)?; // Next state: status
 
