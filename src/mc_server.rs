@@ -67,7 +67,9 @@ pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Er
     // Build handshake packet
     eprintln!("🔍 [DEBUG] Building handshake packet...");
     let mut handshake = Vec::new();
+    eprintln!("🔍 [DEBUG] Step 1: write_varint 0");
     write_varint(&mut handshake, 0)?; // Packet ID: handshake
+    eprintln!("🔍 [DEBUG] Step 2: write_varint -1");
     write_varint(&mut handshake, -1)?; // Protocol version (-1 for auto-detection)
 
     // Use the resolved IP address and port
@@ -76,9 +78,13 @@ pub fn ping_server(address: &str) -> Result<ServerStatus, Box<dyn std::error::Er
 
     eprintln!("🔍 [DEBUG] Using host: {} port: {}", host_str, port);
 
+    eprintln!("🔍 [DEBUG] Step 3: write_string");
     write_string(&mut handshake, &host_str)?;
+    eprintln!("🔍 [DEBUG] Step 4: write port");
     handshake.write_all(&port.to_be_bytes())?; // Port
+    eprintln!("🔍 [DEBUG] Step 5: write_varint 1");
     write_varint(&mut handshake, 1)?; // Next state: status
+    eprintln!("🔍 [DEBUG] Handshake packet built successfully");
 
     // Send handshake
     eprintln!("🔍 [DEBUG] Sending handshake packet...");
