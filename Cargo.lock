@@ -1085,7 +1085,6 @@ version = "0.3.0"
 dependencies = [
  "dotenv",
  "poise",
- "rand 0.9.2",
  "reqwest 0.12.25",
  "rusqlite",
  "serde",
