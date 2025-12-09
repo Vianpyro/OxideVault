@@ -128,7 +128,10 @@ fn read_packet(stream: &mut TcpStream) -> std::io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
-fn write_varint(buf: &mut Vec<u8>, mut value: i32) -> std::io::Result<()> {
+fn write_varint(buf: &mut Vec<u8>, value: i32) -> std::io::Result<()> {
+    // Convert to unsigned for proper bit manipulation with negative numbers
+    let mut value = value as u32;
+
     loop {
         let mut temp = (value & 0x7F) as u8;
         value >>= 7;
