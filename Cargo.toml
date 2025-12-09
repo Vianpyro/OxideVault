@@ -2,7 +2,15 @@
 name = "oxidevault"
 authors = ["Vianpyro"]
 version = "0.2.9"
-edition = "2024"
+edition = "2021"
+
+[lib]
+name = "oxidevault"
+path = "src/lib.rs"
+
+[[bin]]
+name = "oxidevault"
+path = "src/main.rs"
 
 [dependencies]
 poise = "0.6.1"

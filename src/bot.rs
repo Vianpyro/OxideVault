@@ -1,56 +1,34 @@
+//! Discord bot initialization and configuration.
+//!
+//! This module handles the setup and execution of the Discord bot,
+//! including command registration and framework initialization.
+
 use crate::types::Data;
 use crate::commands::{ping, uuid, online};
 use crate::database;
+use crate::config::Config;
 use poise::serenity_prelude as serenity;
-use dotenv::dotenv;
-use std::env;
 
+/// Run the Discord bot.
+///
+/// This function initializes the bot with configuration from environment variables,
+/// sets up the database, and starts the Discord client.
+///
+/// # Errors
+///
+/// Returns an error if configuration is invalid, database initialization fails,
+/// or the Discord client cannot be started.
 pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    dotenv().ok();
+    // Load configuration from environment
+    let config = Config::from_env()?;
 
-    let token = match env::var("DISCORD_TOKEN") {
-        Ok(t) => t,
-        Err(_) => {
-            return Err("Missing DISCORD_TOKEN environment variable. Set it in your environment or create a .env file (never commit this file).".into());
-        }
-    };
-
-    let intents = serenity::GatewayIntents::non_privileged();
-
-    // Use DB_PATH if set, otherwise default to ./data/oxidevault.db in current directory
-    let db_path = match std::env::var("DB_PATH") {
-        Ok(val) => val,
-        Err(_) => {
-            let mut path = match std::env::current_dir() {
-                Ok(p) => p,
-                Err(e) => {
-                    return Err(format!("Failed to determine current directory: {}", e).into());
-                }
-            };
-            path.push("data");
-            path.push("oxidevault.db");
-            match path.into_os_string().into_string() {
-                Ok(s) => s,
-                Err(os_str) => {
-                    return Err(format!("Database path contains invalid Unicode: {:?}", os_str).into());
-                }
-            }
-        }
-    };
-
-    // Initialize DB (creates file and tables if needed)
-    database::init_db(&db_path).await?;
+    // Initialize database
+    database::init_db(&config.db_path).await?;
 
     // Create HTTP client for API requests (reused across requests for better performance)
     let http_client = reqwest::Client::new();
 
-    // Get Minecraft server address from environment
-    let mc_server_address = match env::var("MC_SERVER_ADDRESS") {
-        Ok(addr) => addr,
-        Err(_) => {
-            return Err("Missing MC_SERVER_ADDRESS environment variable. Set it in your environment or .env file (e.g., MC_SERVER_ADDRESS=localhost:25565).".into());
-        }
-    };
+    let intents = serenity::GatewayIntents::non_privileged();
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -58,9 +36,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             ..Default::default()
         })
         .setup(move |context, _ready, framework| {
-            let db_path = db_path.clone();
+            let db_path = config.db_path.clone();
             let http_client = http_client.clone();
-            let mc_server_address = mc_server_address.clone();
+            let mc_server_address = config.mc_server_address.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(context, &framework.options().commands).await?;
                 Ok(Data { db_path, http_client, mc_server_address })
@@ -68,8 +46,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         })
         .build();
 
-
-    let mut client = serenity::ClientBuilder::new(token, intents).framework(framework).await?;
+    let mut client = serenity::ClientBuilder::new(config.discord_token, intents)
+        .framework(framework)
+        .await?;
 
     client.start().await?;
 
