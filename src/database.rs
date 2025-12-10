@@ -243,3 +243,176 @@ impl PlayerRepository {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    /// Helper function to create a test database in a temporary directory
+    async fn setup_test_db() -> (TempDir, PlayerRepository) {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let db_path = temp_dir.path().join("test.db");
+        let db_path_str = db_path.to_str().expect("Invalid path").to_string();
+        
+        init_db(&db_path_str).await.expect("Failed to initialize database");
+        
+        let repo = PlayerRepository::new(db_path_str);
+        (temp_dir, repo)
+    }
+
+    #[tokio::test]
+    async fn test_upsert_player_insert() {
+        let (_temp_dir, repo) = setup_test_db().await;
+        
+        let player = MinecraftPlayer {
+            uuid: "550e8400-e29b-41d4-a716-446655440000".to_string(),
+            username: "TestPlayer".to_string(),
+        };
+        
+        // Insert player
+        let result = repo.upsert_player(player.clone()).await;
+        assert!(result.is_ok());
+        
+        // Verify player was inserted
+        let retrieved = repo.get_player_by_uuid(&player.uuid).await.unwrap();
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.uuid, player.uuid);
+        assert_eq!(retrieved.username, player.username);
+    }
+
+    #[tokio::test]
+    async fn test_upsert_player_update() {
+        let (_temp_dir, repo) = setup_test_db().await;
+        
+        let uuid = "550e8400-e29b-41d4-a716-446655440001".to_string();
+        
+        // Insert player
+        let player1 = MinecraftPlayer {
+            uuid: uuid.clone(),
+            username: "OldUsername".to_string(),
+        };
+        repo.upsert_player(player1).await.unwrap();
+        
+        // Update player with same UUID but different username
+        let player2 = MinecraftPlayer {
+            uuid: uuid.clone(),
+            username: "NewUsername".to_string(),
+        };
+        repo.upsert_player(player2).await.unwrap();
+        
+        // Verify player was updated
+        let retrieved = repo.get_player_by_uuid(&uuid).await.unwrap();
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.username, "NewUsername");
+    }
+
+    #[tokio::test]
+    async fn test_get_player_by_uuid() {
+        let (_temp_dir, repo) = setup_test_db().await;
+        
+        let player = MinecraftPlayer {
+            uuid: "550e8400-e29b-41d4-a716-446655440002".to_string(),
+            username: "UuidTestPlayer".to_string(),
+        };
+        repo.upsert_player(player.clone()).await.unwrap();
+        
+        // Test retrieval by UUID
+        let result = repo.get_player_by_uuid(&player.uuid).await.unwrap();
+        assert!(result.is_some());
+        let retrieved = result.unwrap();
+        assert_eq!(retrieved.uuid, player.uuid);
+        assert_eq!(retrieved.username, player.username);
+        
+        // Test non-existent UUID
+        let result = repo.get_player_by_uuid("non-existent-uuid").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_player_by_username() {
+        let (_temp_dir, repo) = setup_test_db().await;
+        
+        let player = MinecraftPlayer {
+            uuid: "550e8400-e29b-41d4-a716-446655440003".to_string(),
+            username: "UsernameTestPlayer".to_string(),
+        };
+        repo.upsert_player(player.clone()).await.unwrap();
+        
+        // Test retrieval by username
+        let result = repo.get_player_by_username(&player.username).await.unwrap();
+        assert!(result.is_some());
+        let retrieved = result.unwrap();
+        assert_eq!(retrieved.uuid, player.uuid);
+        assert_eq!(retrieved.username, player.username);
+        
+        // Test non-existent username
+        let result = repo.get_player_by_username("NonExistentPlayer").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_all_players() {
+        let (_temp_dir, repo) = setup_test_db().await;
+        
+        // Initially empty
+        let players = repo.get_all_players().await.unwrap();
+        assert_eq!(players.len(), 0);
+        
+        // Add multiple players
+        let player1 = MinecraftPlayer {
+            uuid: "550e8400-e29b-41d4-a716-446655440004".to_string(),
+            username: "Alice".to_string(),
+        };
+        let player2 = MinecraftPlayer {
+            uuid: "550e8400-e29b-41d4-a716-446655440005".to_string(),
+            username: "Bob".to_string(),
+        };
+        let player3 = MinecraftPlayer {
+            uuid: "550e8400-e29b-41d4-a716-446655440006".to_string(),
+            username: "Charlie".to_string(),
+        };
+        
+        repo.upsert_player(player1.clone()).await.unwrap();
+        repo.upsert_player(player2.clone()).await.unwrap();
+        repo.upsert_player(player3.clone()).await.unwrap();
+        
+        // Retrieve all players
+        let players = repo.get_all_players().await.unwrap();
+        assert_eq!(players.len(), 3);
+        
+        // Verify they're ordered by username
+        assert_eq!(players[0].username, "Alice");
+        assert_eq!(players[1].username, "Bob");
+        assert_eq!(players[2].username, "Charlie");
+    }
+
+    #[tokio::test]
+    async fn test_delete_player() {
+        let (_temp_dir, repo) = setup_test_db().await;
+        
+        let player = MinecraftPlayer {
+            uuid: "550e8400-e29b-41d4-a716-446655440007".to_string(),
+            username: "DeleteTestPlayer".to_string(),
+        };
+        repo.upsert_player(player.clone()).await.unwrap();
+        
+        // Verify player exists
+        let result = repo.get_player_by_uuid(&player.uuid).await.unwrap();
+        assert!(result.is_some());
+        
+        // Delete player
+        let delete_result = repo.delete_player(&player.uuid).await;
+        assert!(delete_result.is_ok());
+        
+        // Verify player no longer exists
+        let result = repo.get_player_by_uuid(&player.uuid).await.unwrap();
+        assert!(result.is_none());
+        
+        // Deleting non-existent player should not error
+        let delete_result = repo.delete_player("non-existent-uuid").await;
+        assert!(delete_result.is_ok());
+    }
+}
