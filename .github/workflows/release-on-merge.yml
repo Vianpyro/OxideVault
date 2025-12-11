@@ -18,7 +18,7 @@ jobs:
 
   publish_image:
     name: Build & Publish Docker Image (GHCR)
-    needs: build  # To ensure the binary compiles successfully before building the image
+    needs: build # To ensure the binary compiles successfully before building the image
     runs-on: ubuntu-latest
     permissions:
       contents: read

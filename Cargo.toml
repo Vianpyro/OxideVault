@@ -1,8 +1,16 @@
 [package]
 name = "oxidevault"
 authors = ["Vianpyro"]
-version = "0.2.9"
-edition = "2024"
+version = "0.2.10"
+edition = "2021"
+
+[lib]
+name = "oxidevault"
+path = "src/lib.rs"
+
+[[bin]]
+name = "oxidevault"
+path = "src/main.rs"
 
 [dependencies]
 poise = "0.6.1"
@@ -15,3 +23,8 @@ serde_json = "1.0"
 tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
 dotenv = "0.15.0"
 rusqlite = { version = "0.37.0", features = ["bundled"] }
+fastnbt = "2.6.0"
+
+[dev-dependencies]
+tempfile = "3.15"
+mockito = "1.7"

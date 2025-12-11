@@ -1,8 +1,12 @@
+//! Online players command.
+//!
+//! Queries the Minecraft server for status and online player information.
+
 use crate::types::{Context, Error};
 use crate::mc_server;
 
+/// Check the status and online players of the configured Minecraft server.
 #[poise::command(slash_command)]
-// Check the status and online players of the Minecraft server
 pub async fn online(
     context: Context<'_>,
 ) -> Result<(), Error> {
