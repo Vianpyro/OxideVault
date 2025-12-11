@@ -126,26 +126,16 @@ impl PlayerRepository {
         Ok(())
     }
 
-    /// Get a player by UUID.
-    ///
-    /// # Arguments
-    ///
-    /// * `uuid` - The player's UUID
-    ///
-    /// # Returns
-    ///
-    /// Returns `Some(player)` if found, `None` otherwise.
-    #[allow(dead_code)]
-    pub async fn get_player_by_uuid(&self, uuid: &str) -> Result<Option<MinecraftPlayer>> {
+    /// Helper function to query a single player by a specific column.
+    async fn get_player_by_column(&self, column: &str, value: &str) -> Result<Option<MinecraftPlayer>> {
         let db_path = self.db_path.clone();
-        let uuid = uuid.to_string();
+        let query = format!("SELECT mc_uuid, mc_username FROM minecraft_users WHERE {} = ?1", column);
+        let value = value.to_string();
+
         tokio::task::spawn_blocking(move || {
             let conn = Connection::open(&db_path)?;
-            let mut stmt = conn.prepare(
-                "SELECT mc_uuid, mc_username FROM minecraft_users WHERE mc_uuid = ?1"
-            )?;
-
-            let mut rows = stmt.query(rusqlite::params![uuid])?;
+            let mut stmt = conn.prepare(&query)?;
+            let mut rows = stmt.query(rusqlite::params![value])?;
 
             if let Some(row) = rows.next()? {
                 Ok(Some(MinecraftPlayer {
@@ -160,6 +150,20 @@ impl PlayerRepository {
         .map_err(|e| OxideVaultError::Database(format!("Task join error: {}", e)))?
     }
 
+    /// Get a player by UUID.
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid` - The player's UUID
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(player)` if found, `None` otherwise.
+    #[allow(dead_code)]
+    pub async fn get_player_by_uuid(&self, uuid: &str) -> Result<Option<MinecraftPlayer>> {
+        self.get_player_by_column("mc_uuid", uuid).await
+    }
+
     /// Get a player by username.
     ///
     /// # Arguments
@@ -171,27 +175,7 @@ impl PlayerRepository {
     /// Returns `Some(player)` if found, `None` otherwise.
     #[allow(dead_code)]
     pub async fn get_player_by_username(&self, username: &str) -> Result<Option<MinecraftPlayer>> {
-        let db_path = self.db_path.clone();
-        let username = username.to_string();
-        tokio::task::spawn_blocking(move || {
-            let conn = Connection::open(&db_path)?;
-            let mut stmt = conn.prepare(
-                "SELECT mc_uuid, mc_username FROM minecraft_users WHERE mc_username = ?1"
-            )?;
-
-            let mut rows = stmt.query(rusqlite::params![username])?;
-
-            if let Some(row) = rows.next()? {
-                Ok(Some(MinecraftPlayer {
-                    uuid: row.get(0)?,
-                    username: row.get(1)?,
-                }))
-            } else {
-                Ok(None)
-            }
-        })
-        .await
-        .map_err(|e| OxideVaultError::Database(format!("Task join error: {}", e)))?
+        self.get_player_by_column("mc_username", username).await
     }
 
     /// Get all players from the database.
