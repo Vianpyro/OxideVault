@@ -134,3 +134,63 @@ pub fn ping_server(address: &str) -> Result<ServerStatus> {
 
     Ok(status)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ping_server_invalid_address() {
+        // Test with invalid address format
+        let result = ping_server("invalid-address-no-port");
+        assert!(result.is_err());
+        
+        // Test with non-resolvable address
+        let result = ping_server("nonexistent.invalid.domain.test:25565");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ping_server_connection_refused() {
+        // Test with localhost on a port that's likely closed
+        // This should fail with connection refused
+        let result = ping_server("127.0.0.1:1");
+        assert!(result.is_err());
+        match result {
+            Err(OxideVaultError::ServerProtocol(msg)) => {
+                assert!(msg.contains("Connection failed") || msg.contains("connection"));
+            }
+            Err(OxideVaultError::Io(_)) => {
+                // Also acceptable - IO error for connection issues
+            }
+            _ => panic!("Expected ServerProtocol or Io error"),
+        }
+    }
+
+    #[test]
+    fn test_description_text() {
+        let desc_string = Description::String("A Minecraft Server".to_string());
+        assert_eq!(desc_string.text(), "A Minecraft Server");
+
+        let desc_object = Description::Object {
+            text: "Another Server".to_string(),
+        };
+        assert_eq!(desc_object.text(), "Another Server");
+    }
+
+    // Note: Testing successful ping_server connections requires a running Minecraft server
+    // In a real CI/CD environment, you would either:
+    // 1. Set up a test Minecraft server in your CI pipeline
+    // 2. Use integration tests that run separately from unit tests
+    // 3. Mock the TcpStream for more detailed testing
+    //
+    // Example test that would work with a real server:
+    // #[test]
+    // #[ignore] // Ignored by default, run with --ignored flag when server is available
+    // fn test_ping_server_success() {
+    //     let result = ping_server("localhost:25565");
+    //     assert!(result.is_ok());
+    //     let status = result.unwrap();
+    //     assert!(status.players.max > 0);
+    // }
+}
