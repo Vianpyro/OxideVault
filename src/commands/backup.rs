@@ -259,12 +259,30 @@ fn process_backup(file_path: &PathBuf) -> Result<(Vec<Vec<u8>>, usize), Box<dyn 
     Ok((chunks, total_size))
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
     use std::io::Write;
     use tempfile::TempDir;
+
+    /// Helper function to verify that a backup file is found with the expected name.
+    fn assert_backup_found(temp_dir: &TempDir, expected_name: &str) {
+        let result = find_most_recent_backup(temp_dir.path().to_str().unwrap());
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().file_name().unwrap(), expected_name);
+    }
+
+    /// Helper function to verify a single-chunk backup with expected properties.
+    fn assert_single_chunk_backup(file_path: &PathBuf, expected_size: usize) {
+        let result = process_backup(file_path);
+        assert!(result.is_ok());
+        
+        let (chunks, total_size) = result.unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(total_size, expected_size);
+    }
 
     #[test]
     fn test_find_most_recent_backup_empty_folder() {
@@ -285,9 +303,7 @@ mod tests {
         let file_path = temp_dir.path().join("backup1.tgz");
         fs::write(&file_path, b"test data").unwrap();
 
-        let result = find_most_recent_backup(temp_dir.path().to_str().unwrap());
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().file_name().unwrap(), "backup1.tgz");
+        assert_backup_found(&temp_dir, "backup1.tgz");
     }
 
     #[test]
@@ -322,9 +338,7 @@ mod tests {
         let file_path = temp_dir.path().join("backup.tgz");
         fs::write(&file_path, b"test data").unwrap();
 
-        let result = find_most_recent_backup(temp_dir.path().to_str().unwrap());
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().file_name().unwrap(), "backup.tgz");
+        assert_backup_found(&temp_dir, "backup.tgz");
     }
 
     #[test]
@@ -334,12 +348,10 @@ mod tests {
         let test_data = b"This is a small test file";
         fs::write(&file_path, test_data).unwrap();
 
-        let result = process_backup(&file_path);
-        assert!(result.is_ok());
+        assert_single_chunk_backup(&file_path, test_data.len());
         
-        let (chunks, total_size) = result.unwrap();
-        assert_eq!(chunks.len(), 1);
-        assert_eq!(total_size, test_data.len());
+        // Additional verification of chunk contents
+        let (chunks, _) = process_backup(&file_path).unwrap();
         assert_eq!(&chunks[0], test_data);
     }
 
@@ -411,12 +423,10 @@ mod tests {
         let test_data = vec![0u8; chunk_size];
         fs::write(&file_path, &test_data).unwrap();
 
-        let result = process_backup(&file_path);
-        assert!(result.is_ok());
+        assert_single_chunk_backup(&file_path, chunk_size);
         
-        let (chunks, total_size) = result.unwrap();
-        assert_eq!(chunks.len(), 1);
-        assert_eq!(total_size, chunk_size);
+        // Additional verification of chunk size
+        let (chunks, _) = process_backup(&file_path).unwrap();
         assert_eq!(chunks[0].len(), chunk_size);
     }
 }
