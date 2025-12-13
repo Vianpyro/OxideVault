@@ -11,7 +11,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 /// Send the most recent backup file from the backup folder.
-/// 
+///
 /// Large backups are compressed with gzip and split into 24MB chunks for Discord compatibility.
 #[poise::command(slash_command)]
 pub async fn backup(
@@ -46,7 +46,7 @@ pub async fn backup(
                 Ok((chunks, original_size)) => {
                     // Send all chunks
                     let total_chunks = chunks.len();
-                    
+
                     let size_mb = original_size as f64 / (1024.0 * 1024.0);
                     context.say(format!(
                         "📦 Sending backup: **{}** ({:.2} MB, {} chunk{}).",
@@ -64,7 +64,7 @@ pub async fn backup(
                         };
 
                         let attachment = serenity::CreateAttachment::bytes(chunk_data.clone(), &chunk_name);
-                        
+
                         context.send(
                             poise::CreateReply::default()
                                 .content(format!(
@@ -172,7 +172,7 @@ fn process_backup(file_path: &PathBuf) -> Result<(Vec<Vec<u8>>, usize), Box<dyn 
     // Split into chunks (25 MB limit for Discord)
     const CHUNK_SIZE: usize = 24 * 1024 * 1024; // 24 MB to be safe
     let mut chunks = Vec::new();
-    
+
     for chunk_data in file_data.chunks(CHUNK_SIZE) {
         chunks.push(chunk_data.to_vec());
     }
