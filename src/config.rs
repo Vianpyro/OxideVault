@@ -14,6 +14,8 @@ pub struct Config {
     pub db_path: String,
     /// Minecraft server address (host:port)
     pub mc_server_address: String,
+    /// Backup folder path
+    pub backup_folder: String,
 }
 
 impl Config {
@@ -53,10 +55,16 @@ impl Config {
         // Validate server address format
         Self::validate_server_address(&mc_server_address)?;
 
+        let backup_folder = env::var("BACKUP_FOLDER")
+            .map_err(|_| OxideVaultError::Config(
+                "Missing BACKUP_FOLDER environment variable. Set it in your environment or .env file (e.g., BACKUP_FOLDER=/path/to/backups).".to_string()
+            ))?;
+
         Ok(Self {
             discord_token,
             db_path,
             mc_server_address,
+            backup_folder,
         })
     }
 
@@ -122,15 +130,15 @@ mod tests {
     fn test_get_db_path_with_env_var() {
         // Save original value (if any)
         let original_value = env::var("DB_PATH").ok();
-        
+
         // Set custom path
         let custom_path = "/custom/path/to/database.db";
         env::set_var("DB_PATH", custom_path);
-        
+
         let result = Config::get_db_path();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), custom_path);
-        
+
         // Restore original value
         match original_value {
             Some(val) => env::set_var("DB_PATH", val),
@@ -142,19 +150,19 @@ mod tests {
     fn test_get_db_path_default() {
         // Save original value (if any)
         let original_value = env::var("DB_PATH").ok();
-        
+
         // Remove DB_PATH env var to test default behavior
         env::remove_var("DB_PATH");
-        
+
         let result = Config::get_db_path();
         assert!(result.is_ok());
-        
+
         let path = result.unwrap();
         // Verify the path contains expected components
         assert!(path.contains("data"));
         assert!(path.contains("oxidevault.db"));
         assert!(path.ends_with("data/oxidevault.db") || path.ends_with("data\\oxidevault.db"));
-        
+
         // Restore original value
         match original_value {
             Some(val) => env::set_var("DB_PATH", val),
