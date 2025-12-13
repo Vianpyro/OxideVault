@@ -60,6 +60,9 @@ impl Config {
                 "Missing BACKUP_FOLDER environment variable. Set it in your environment or .env file (e.g., BACKUP_FOLDER=/path/to/backups).".to_string()
             ))?;
 
+        // Validate backup folder path
+        Self::validate_backup_folder(&backup_folder)?;
+
         Ok(Self {
             discord_token,
             db_path,
@@ -106,6 +109,33 @@ impl Config {
                 ))?;
         }
 
+        Ok(())
+    }
+
+    /// Validate that the backup folder path exists and is a directory.
+    fn validate_backup_folder(path: &str) -> Result<()> {
+        use std::path::Path;
+        
+        let backup_path = Path::new(path);
+        
+        if !backup_path.is_absolute() {
+            return Err(OxideVaultError::Config(
+                format!("BACKUP_FOLDER must be an absolute path, got: '{}'", path)
+            ));
+        }
+        
+        if !backup_path.exists() {
+            return Err(OxideVaultError::Config(
+                format!("BACKUP_FOLDER path does not exist: '{}'", path)
+            ));
+        }
+        
+        if !backup_path.is_dir() {
+            return Err(OxideVaultError::Config(
+                format!("BACKUP_FOLDER path is not a directory: '{}'", path)
+            ));
+        }
+        
         Ok(())
     }
 }

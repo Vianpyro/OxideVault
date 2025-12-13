@@ -51,11 +51,21 @@ cat backup.tgz.part* > backup.tgz
 tar -xzf backup.tgz
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell 5.1 and below):**
 
 ```powershell
 # Combine all parts in order
 Get-Content backup.tgz.part* -Raw | Set-Content backup.tgz -Encoding Byte
+
+# Extract (requires tar - built into Windows 10+)
+tar -xzf backup.tgz
+```
+
+**Windows (PowerShell Core 6.0+):**
+
+```powershell
+# Combine all parts in order
+Get-Content backup.tgz.part* -AsByteStream | Set-Content backup.tgz -AsByteStream
 
 # Extract (requires tar - built into Windows 10+)
 tar -xzf backup.tgz
