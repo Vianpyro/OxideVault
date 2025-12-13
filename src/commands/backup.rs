@@ -241,7 +241,7 @@ fn process_backup(file_path: &PathBuf) -> Result<(Vec<Vec<u8>>, usize), Box<dyn 
     const CHUNK_SIZE: usize = 24 * 1024 * 1024; // 24 MB to be safe
 
     loop {
-        let mut buffer = Vec::with_capacity(CHUNK_SIZE);
+        let mut buffer = Vec::new();
         let n = {
             // Read up to CHUNK_SIZE bytes
             let mut handle = file.by_ref().take(CHUNK_SIZE as u64);
