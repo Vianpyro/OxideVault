@@ -8,6 +8,9 @@ use crate::commands::{ping, uuid, online, backup};
 use crate::database;
 use crate::config::Config;
 use poise::serenity_prelude as serenity;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use std::collections::HashMap;
 
 /// Run the Discord bot.
 ///
@@ -42,7 +45,14 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let backup_folder = config.backup_folder.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(context, &framework.options().commands).await?;
-                Ok(Data { db_path, http_client, mc_server_address, backup_folder })
+                Ok(Data {
+                    db_path,
+                    http_client,
+                    mc_server_address,
+                    backup_folder,
+                    last_backup_time: Arc::new(RwLock::new(HashMap::new())),
+                    last_global_backup_time: Arc::new(RwLock::new(None)),
+                })
             })
         })
         .build();

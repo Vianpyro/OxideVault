@@ -3,6 +3,10 @@
 //! This module contains shared types used throughout the application.
 
 use crate::database::PlayerRepository;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use std::collections::HashMap;
+use std::time::Instant;
 
 /// Bot application data shared across all commands.
 ///
@@ -16,6 +20,10 @@ pub struct Data {
     pub mc_server_address: String,
     /// Backup folder path
     pub backup_folder: String,
+    /// Rate limiter for backup command: tracks last backup time per user
+    pub last_backup_time: Arc<RwLock<HashMap<u64, Instant>>>,
+    /// Global rate limiter: tracks last backup time (any user)
+    pub last_global_backup_time: Arc<RwLock<Option<Instant>>>,
 }
 
 impl Data {

@@ -9,6 +9,7 @@ use poise::serenity_prelude as serenity;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 /// Send the most recent backup file from the backup folder.
 ///
@@ -17,6 +18,62 @@ use std::path::PathBuf;
 pub async fn backup(
     context: Context<'_>,
 ) -> Result<(), Error> {
+    // Global rate limiting: 2 hours cooldown between any uses
+    const GLOBAL_COOLDOWN: Duration = Duration::from_secs(2 * 60 * 60);
+
+    let global_last_backup = context.data().last_global_backup_time.read().await;
+    if let Some(last_time) = *global_last_backup {
+        let elapsed = last_time.elapsed();
+        if elapsed < GLOBAL_COOLDOWN {
+            let remaining = GLOBAL_COOLDOWN - elapsed;
+            let hours = remaining.as_secs() / 3600;
+            let minutes = (remaining.as_secs() % 3600) / 60;
+
+            context.say(format!(
+                "⏳ Backup command is globally on cooldown. Please wait {} hour{} and {} minute{}.",
+                hours,
+                if hours == 1 { "" } else { "s" },
+                minutes,
+                if minutes == 1 { "" } else { "s" }
+            )).await?;
+            return Ok(());
+        }
+    }
+    drop(global_last_backup);
+
+    // Per-user rate limiting: 1 day cooldown per user
+    const COOLDOWN_DURATION: Duration = Duration::from_secs(24 * 60 * 60);
+
+    let user_id = context.author().id.get();
+    let mut last_backup_map = context.data().last_backup_time.write().await;
+
+    if let Some(last_time) = last_backup_map.get(&user_id) {
+        let elapsed = last_time.elapsed();
+        if elapsed < COOLDOWN_DURATION {
+            let remaining = COOLDOWN_DURATION - elapsed;
+            let hours = remaining.as_secs() / 3600;
+            let minutes = (remaining.as_secs() % 3600) / 60;
+
+            context.say(format!(
+                "⏳ Backup command is on cooldown. Please wait {} hour{} and {} minute{}.",
+                hours,
+                if hours == 1 { "" } else { "s" },
+                minutes,
+                if minutes == 1 { "" } else { "s" }
+            )).await?;
+            return Ok(());
+        }
+    }
+
+    // Update last backup time (both global and per-user)
+    let now = Instant::now();
+    last_backup_map.insert(user_id, now);
+    drop(last_backup_map); // Release the lock
+
+    let mut global_backup_time = context.data().last_global_backup_time.write().await;
+    *global_backup_time = Some(now);
+    drop(global_backup_time);
+
     // Defer reply since processing might take a while
     context.defer().await?;
 
