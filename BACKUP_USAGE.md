@@ -14,7 +14,7 @@ BACKUP_FOLDER=/path/to/your/minecraft/backups
 ## Usage
 
 In Discord, run:
-```
+```cmd
 /backup
 ```
 
