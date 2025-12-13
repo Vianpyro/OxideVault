@@ -258,3 +258,165 @@ fn process_backup(file_path: &PathBuf) -> Result<(Vec<Vec<u8>>, usize), Box<dyn 
 
     Ok((chunks, total_size))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_find_most_recent_backup_empty_folder() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = find_most_recent_backup(temp_dir.path().to_str().unwrap());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_find_most_recent_backup_nonexistent_folder() {
+        let result = find_most_recent_backup("/nonexistent/path/that/should/not/exist");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_find_most_recent_backup_single_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("backup1.tgz");
+        fs::write(&file_path, b"test data").unwrap();
+
+        let result = find_most_recent_backup(temp_dir.path().to_str().unwrap());
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().file_name().unwrap(), "backup1.tgz");
+    }
+
+    #[test]
+    fn test_find_most_recent_backup_multiple_files() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create first file
+        let file1_path = temp_dir.path().join("backup1.tgz");
+        fs::write(&file1_path, b"old data").unwrap();
+        
+        // Sleep briefly to ensure different modification times
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Create second file (should be more recent)
+        let file2_path = temp_dir.path().join("backup2.tgz");
+        fs::write(&file2_path, b"new data").unwrap();
+
+        let result = find_most_recent_backup(temp_dir.path().to_str().unwrap());
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().file_name().unwrap(), "backup2.tgz");
+    }
+
+    #[test]
+    fn test_find_most_recent_backup_ignores_directories() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create a subdirectory
+        let subdir = temp_dir.path().join("subdir");
+        fs::create_dir(&subdir).unwrap();
+        
+        // Create a file in the temp dir
+        let file_path = temp_dir.path().join("backup.tgz");
+        fs::write(&file_path, b"test data").unwrap();
+
+        let result = find_most_recent_backup(temp_dir.path().to_str().unwrap());
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().file_name().unwrap(), "backup.tgz");
+    }
+
+    #[test]
+    fn test_process_backup_small_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("small.tgz");
+        let test_data = b"This is a small test file";
+        fs::write(&file_path, test_data).unwrap();
+
+        let result = process_backup(&file_path);
+        assert!(result.is_ok());
+        
+        let (chunks, total_size) = result.unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(total_size, test_data.len());
+        assert_eq!(&chunks[0], test_data);
+    }
+
+    #[test]
+    fn test_process_backup_large_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("large.tgz");
+        
+        // Create a file larger than CHUNK_SIZE (24 MB)
+        // Use 50 MB for testing
+        let chunk_size = 24 * 1024 * 1024;
+        let total_size = 50 * 1024 * 1024;
+        
+        {
+            let mut file = fs::File::create(&file_path).unwrap();
+            let pattern = b"ABCDEFGH";
+            let mut written = 0;
+            while written < total_size {
+                let to_write = std::cmp::min(pattern.len(), total_size - written);
+                file.write_all(&pattern[..to_write]).unwrap();
+                written += to_write;
+            }
+        }
+
+        let result = process_backup(&file_path);
+        assert!(result.is_ok());
+        
+        let (chunks, size) = result.unwrap();
+        // Should have at least 2 chunks for a 50MB file with 24MB chunks
+        assert!(chunks.len() >= 2);
+        assert_eq!(size, total_size);
+        
+        // Verify total size by summing chunk sizes
+        let total_chunk_size: usize = chunks.iter().map(|c| c.len()).sum();
+        assert_eq!(total_chunk_size, total_size);
+        
+        // Verify first chunk is at most CHUNK_SIZE
+        assert!(chunks[0].len() <= chunk_size);
+    }
+
+    #[test]
+    fn test_process_backup_nonexistent_file() {
+        let file_path = PathBuf::from("/nonexistent/file.tgz");
+        let result = process_backup(&file_path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_process_backup_empty_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("empty.tgz");
+        fs::write(&file_path, b"").unwrap();
+
+        let result = process_backup(&file_path);
+        assert!(result.is_ok());
+        
+        let (chunks, total_size) = result.unwrap();
+        assert_eq!(chunks.len(), 0);
+        assert_eq!(total_size, 0);
+    }
+
+    #[test]
+    fn test_process_backup_exact_chunk_size() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("exact.tgz");
+        
+        // Create a file that's exactly CHUNK_SIZE (24 MB)
+        let chunk_size = 24 * 1024 * 1024;
+        let test_data = vec![0u8; chunk_size];
+        fs::write(&file_path, &test_data).unwrap();
+
+        let result = process_backup(&file_path);
+        assert!(result.is_ok());
+        
+        let (chunks, total_size) = result.unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(total_size, chunk_size);
+        assert_eq!(chunks[0].len(), chunk_size);
+    }
+}
