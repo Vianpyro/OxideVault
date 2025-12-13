@@ -4,7 +4,7 @@
 //! including command registration and framework initialization.
 
 use crate::types::Data;
-use crate::commands::{ping, uuid, online};
+use crate::commands::{ping, uuid, online, backup};
 use crate::database;
 use crate::config::Config;
 use poise::serenity_prelude as serenity;
@@ -32,16 +32,17 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![ping(), uuid(), online()],
+            commands: vec![ping(), uuid(), online(), backup()],
             ..Default::default()
         })
         .setup(move |context, _ready, framework| {
             let db_path = config.db_path.clone();
             let http_client = http_client.clone();
             let mc_server_address = config.mc_server_address.clone();
+            let backup_folder = config.backup_folder.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(context, &framework.options().commands).await?;
-                Ok(Data { db_path, http_client, mc_server_address })
+                Ok(Data { db_path, http_client, mc_server_address, backup_folder })
             })
         })
         .build();

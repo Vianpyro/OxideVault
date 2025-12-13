@@ -14,6 +14,8 @@ pub struct Config {
     pub db_path: String,
     /// Minecraft server address (host:port)
     pub mc_server_address: String,
+    /// Backup folder path
+    pub backup_folder: String,
 }
 
 impl Config {
@@ -53,10 +55,16 @@ impl Config {
         // Validate server address format
         Self::validate_server_address(&mc_server_address)?;
 
+        let backup_folder = env::var("BACKUP_FOLDER")
+            .map_err(|_| OxideVaultError::Config(
+                "Missing BACKUP_FOLDER environment variable. Set it in your environment or .env file (e.g., BACKUP_FOLDER=/path/to/backups).".to_string()
+            ))?;
+
         Ok(Self {
             discord_token,
             db_path,
             mc_server_address,
+            backup_folder,
         })
     }
 

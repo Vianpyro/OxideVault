@@ -14,6 +14,8 @@ pub struct Data {
     pub http_client: reqwest::Client,
     /// Minecraft server address to query
     pub mc_server_address: String,
+    /// Backup folder path
+    pub backup_folder: String,
 }
 
 impl Data {
