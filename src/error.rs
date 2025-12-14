@@ -24,6 +24,8 @@ pub enum OxideVaultError {
     Validation(String),
     /// Generic I/O errors
     Io(std::io::Error),
+    /// Invalid input errors
+    InvalidInput(String),
 }
 
 impl fmt::Display for OxideVaultError {
@@ -37,18 +39,12 @@ impl fmt::Display for OxideVaultError {
             Self::Discord(msg) => write!(f, "Discord error: {}", msg),
             Self::Validation(msg) => write!(f, "Validation error: {}", msg),
             Self::Io(err) => write!(f, "I/O error: {}", err),
+            Self::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
         }
     }
 }
 
-impl std::error::Error for OxideVaultError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Io(err) => Some(err),
-            _ => None,
-        }
-    }
-}
+impl std::error::Error for OxideVaultError {}
 
 // Implement From traits for automatic error conversion
 impl From<std::io::Error> for OxideVaultError {

@@ -7,6 +7,7 @@ pub mod error;
 pub mod config;
 pub mod database;
 pub mod mojang;
+pub mod pl3xmap;
 pub mod mc_server;
 pub mod utils;
 
