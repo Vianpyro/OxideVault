@@ -43,6 +43,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let http_client = http_client.clone();
             let mc_server_address = config.mc_server_address.clone();
             let backup_folder = config.backup_folder.clone();
+            let backup_publish_root = config.backup_publish_root.clone();
+            let backup_public_base_url = config.backup_public_base_url.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(context, &framework.options().commands).await?;
                 Ok(Data {
@@ -52,6 +54,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     backup_folder,
                     last_backup_time: Arc::new(RwLock::new(HashMap::new())),
                     last_global_backup_time: Arc::new(RwLock::new(None)),
+                    backup_publish_root,
+                    backup_public_base_url,
                 })
             })
         })
