@@ -18,14 +18,14 @@ To get started with this project:
 
 The repository contains the following directories and files:
 
-- `.devcontainer/` - Development container configuration for VS Code
+- `.devcontainer/` - Development container configuration for Visual Studio Code
   - `devcontainer.json` - Dev container settings
   - `Dockerfile` - Container image definition
 - `.github/` - GitHub-specific configurations
   - `ISSUE_TEMPLATE/` - Issue templates (bug reports, feature requests)
   - `pull_request_template.md` - Pull request template
   - `workflows/` - GitHub Actions workflow files
-- `.vscode/` - VS Code workspace settings and tasks
+- `.vscode/` - Visual Studio Code workspace settings and tasks
 - `.dockerignore` - Docker build exclusions
 - `.gitattributes` - Git attributes configuration
 - `.gitignore` - Git ignore patterns
@@ -58,6 +58,7 @@ BACKUP_PUBLIC_BASE_URL=https://drop.example.com/backups
 ```
 
 Example workflow:
+
 1. The bot creates `/backups/public/<token>/my_backup.tgz` (hard-linked if possible, otherwise copied).
 2. Caddy serves `/backups/public` at `https://drop.example.com/backups`.
 3. The bot sends `https://drop.example.com/backups/<token>/my_backup.tgz` with `curl` / `Invoke-WebRequest` commands.
@@ -91,6 +92,7 @@ PairDrop is useful for ad-hoc transfers between browsers. The bot cannot automat
 1. Run PairDrop on your LAN behind Caddy (HTTPS).
 2. Restrict access: LAN only, or Basic Auth/IP allowlist.
 3. Use PairDrop manually for ad-hoc exchanges; for bot backups, prefer the HTTPS link described above.
+
 ## 📝 License
 
 Specify your license here (if any). For example: MIT, Apache 2.0, etc.

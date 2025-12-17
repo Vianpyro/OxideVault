@@ -19,7 +19,7 @@ BACKUP_PUBLISH_ROOT=/backups/public
 BACKUP_PUBLIC_BASE_URL=https://drop.example.com/backups
 ```
 
-Ensure your reverse proxy serves `BACKUP_PUBLISH_ROOT` at `BACKUP_PUBLIC_BASE_URL` (see README for Caddy example).
+Ensure your reverse proxy serves `BACKUP_PUBLISH_ROOT` at `BACKUP_PUBLIC_BASE_URL` (see readme for Caddy example).
 
 ## How Backup Publishing Works
 
@@ -32,6 +32,7 @@ Ensure your reverse proxy serves `BACKUP_PUBLISH_ROOT` at `BACKUP_PUBLIC_BASE_UR
 ## Example
 
 After triggering a backup, you receive:
+
 ```md
 📦 Backup ready for download: world_2024-12-13.tgz (1234.56 MB)
 🔗 Link: https://drop.example.com/backups/abc123/world_2024-12-13.tgz
@@ -40,12 +41,14 @@ After triggering a backup, you receive:
 ## Download and Restore
 
 **Linux / macOS**
+
 ```bash
 curl -L "https://drop.example.com/backups/abc123/world_2024-12-13.tgz" -o world_2024-12-13.tgz
 tar -xzf world_2024-12-13.tgz
 ```
 
 **Windows (PowerShell)**
+
 ```powershell
 Invoke-WebRequest -Uri "https://drop.example.com/backups/abc123/world_2024-12-13.tgz" -OutFile world_2024-12-13.tgz
 tar -xzf world_2024-12-13.tgz
