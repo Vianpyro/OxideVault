@@ -115,8 +115,8 @@ pub async fn backup(context: Context<'_>) -> Result<(), Error> {
 
     context
         .say(format!(
-            "📦 Backup prêt au téléchargement : **{}** ({:.2} MB)\n\
-            🔗 Lien : {}",
+            "📦 Backup ready for download: **{}** ({:.2} MB)\n\
+            🔗 Link: {}",
             file_name, size_mb, publish_result.url
         ))
         .await?;
@@ -124,9 +124,9 @@ pub async fn backup(context: Context<'_>) -> Result<(), Error> {
     // Provide ready-to-copy download commands
     context
         .say(format!(
-            "**Télécharger (Linux/macOS)**\n```
+            "**Download (Linux/macOS)**\n```
 curl -L \"{}\" -o \"{}\"\ntar -xzf \"{}\"\n```
-**Télécharger (Windows PowerShell)**\n```
+**Download (Windows PowerShell)**\n```
 Invoke-WebRequest -Uri \"{}\" -OutFile \"{}\"\ntar -xzf \"{}\"\n```",
             publish_result.url,
             file_name,
@@ -206,7 +206,7 @@ fn find_most_recent_backup(backup_folder: &str) -> Option<PathBuf> {
 
 struct PublishedBackup {
     url: String,
-    _local_path: PathBuf,
+    local_path: PathBuf,
     size_bytes: u64,
 }
 
@@ -223,9 +223,10 @@ fn publish_backup(
         .ok_or("Invalid file name")?;
 
     // Generate a random 12-character token for obfuscation and easy revocation
+    let mut rng = rand::rng();
     let token: String = (0..12)
         .map(|_| {
-            let idx = rand::rng().random_range(0..ALPHANUMERIC.len());
+            let idx = rng.random_range(0..ALPHANUMERIC.len());
             ALPHANUMERIC[idx] as char
         })
         .collect();
@@ -238,7 +239,13 @@ fn publish_backup(
     // Attempt hard-link for efficiency; fall back to copy if on different filesystems
     match fs::hard_link(file_path, &target_path) {
         Ok(_) => {}
-        Err(_) => {
+        Err(e) => {
+            eprintln!(
+                "Warning: Failed to create hard link from '{}' to '{}': {}. Falling back to file copy.",
+                file_path.display(),
+                target_path.display(),
+                e
+            );
             fs::copy(file_path, &target_path)?;
         }
     }
@@ -251,7 +258,7 @@ fn publish_backup(
 
     Ok(PublishedBackup {
         url,
-        _local_path: target_path,
+        local_path: target_path,
         size_bytes,
     })
 }
@@ -343,8 +350,96 @@ mod tests {
         assert!(published.url.contains("http://example.com/backups"));
 
         // Ensure file exists at published path
-        assert!(published._local_path.exists());
-        let metadata = fs::metadata(&published._local_path).unwrap();
+        assert!(published.local_path.exists());
+        let metadata = fs::metadata(&published.local_path).unwrap();
         assert_eq!(metadata.len(), b"test data".len() as u64);
+    }
+
+    #[test]
+    fn test_publish_backup_invalid_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let publish_root = temp_dir.path().join("public");
+        let base_url = "http://example.com/backups";
+
+        // Try to publish a non-existent file
+        let file_path = temp_dir.path().join("nonexistent.tgz");
+
+        let result = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_publish_backup_token_uniqueness() {
+        let temp_dir = TempDir::new().unwrap();
+        let publish_root = temp_dir.path().join("public");
+        let base_url = "http://example.com/backups";
+
+        // Create a sample backup file
+        let file_path = temp_dir.path().join("backup1.tgz");
+        fs::write(&file_path, b"test data").unwrap();
+
+        // Publish multiple times and ensure tokens are different
+        let result1 = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url).unwrap();
+        let result2 = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url).unwrap();
+        let result3 = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url).unwrap();
+
+        assert_ne!(result1.url, result2.url, "Tokens should be unique");
+        assert_ne!(result1.url, result3.url, "Tokens should be unique");
+        assert_ne!(result2.url, result3.url, "Tokens should be unique");
+    }
+
+    #[test]
+    fn test_publish_backup_url_format() {
+        let temp_dir = TempDir::new().unwrap();
+        let publish_root = temp_dir.path().join("public");
+
+        // Create a sample backup file
+        let file_path = temp_dir.path().join("backup1.tgz");
+        fs::write(&file_path, b"test data").unwrap();
+
+        // Test with URL without trailing slash
+        let base_url1 = "http://example.com/backups";
+        let result1 = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url1).unwrap();
+        assert!(!result1.url.contains("//backups"), "Should not have double slashes");
+        assert!(result1.url.ends_with("/backup1.tgz"), "Should end with filename");
+
+        // Test with URL with trailing slash
+        let base_url2 = "http://example.com/backups/";
+        let result2 = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url2).unwrap();
+        assert!(!result2.url.contains("backups//"), "Should not have double slashes");
+        assert!(result2.url.ends_with("/backup1.tgz"), "Should end with filename");
+    }
+
+    #[test]
+    fn test_publish_backup_size_metadata() {
+        let temp_dir = TempDir::new().unwrap();
+        let publish_root = temp_dir.path().join("public");
+        let base_url = "http://example.com/backups";
+
+        // Create a sample backup file with known size
+        let test_data = vec![0u8; 1024 * 10]; // 10 KB
+        let file_path = temp_dir.path().join("backup1.tgz");
+        fs::write(&file_path, &test_data).unwrap();
+
+        let result = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url).unwrap();
+        assert_eq!(result.size_bytes, test_data.len() as u64);
+    }
+
+    #[test]
+    fn test_publish_backup_preserves_content() {
+        let temp_dir = TempDir::new().unwrap();
+        let publish_root = temp_dir.path().join("public");
+        let base_url = "http://example.com/backups";
+
+        // Create a sample backup file with specific content
+        let test_content = b"This is a test backup file with specific content";
+        let file_path = temp_dir.path().join("backup1.tgz");
+        fs::write(&file_path, test_content).unwrap();
+
+        let result = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url).unwrap();
+
+        // Read the published file and verify content
+        let published_content = fs::read(&result.local_path).unwrap();
+        assert_eq!(published_content, test_content, "Published file should have same content as original");
     }
 }
