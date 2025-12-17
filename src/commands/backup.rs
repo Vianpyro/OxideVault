@@ -121,28 +121,6 @@ pub async fn backup(context: Context<'_>) -> Result<(), Error> {
         ))
         .await?;
 
-    // Provide ready-to-copy download commands
-    context
-        .say(format!(
-            "**Download (Linux/macOS)**\n```
-curl -L \"{}\" -o \"{}\"\ntar -xzf \"{}\"\n```
-**Download (Windows PowerShell)**\n```
-Invoke-WebRequest -Uri \"{}\" -OutFile \"{}\"\ntar -xzf \"{}\"\n```",
-            publish_result.url,
-            file_name,
-            file_name,
-            publish_result.url,
-            file_name,
-            file_name
-        ))
-        .await?;
-
-    context
-        .say(
-            "⚠️ Remember to delete the published link once download is complete if you want to revoke access.",
-        )
-        .await?;
-
     Ok(())
 }
 
