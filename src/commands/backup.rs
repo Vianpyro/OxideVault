@@ -226,7 +226,7 @@ fn publish_backup(
     let mut rng = rand::rng();
     let token: String = (0..12)
         .map(|_| {
-            let idx = rng.random_range(0..ALPHANUMERIC.len());
+            let idx = rng.gen_range(0..ALPHANUMERIC.len());
             ALPHANUMERIC[idx] as char
         })
         .collect();

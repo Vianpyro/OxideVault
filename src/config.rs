@@ -208,15 +208,6 @@ impl Config {
             ));
         }
         
-        // Warn if URL ends with slash (could cause double slashes)
-        if url_str.ends_with('/') {
-            eprintln!(
-                "Warning: BACKUP_PUBLIC_BASE_URL ends with '/', which may cause double slashes in generated URLs. \
-                Consider removing the trailing slash: '{}'",
-                url_str
-            );
-        }
-        
         Ok(())
     }
     
