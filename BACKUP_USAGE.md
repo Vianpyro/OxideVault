@@ -32,7 +32,7 @@ Ensure your reverse proxy serves `BACKUP_PUBLISH_ROOT` at `BACKUP_PUBLIC_BASE_UR
 ## Example
 
 After triggering a backup, you receive:
-```
+```md
 📦 Backup ready for download: world_2024-12-13.tgz (1234.56 MB)
 🔗 Link: https://drop.example.com/backups/abc123/world_2024-12-13.tgz
 ```
