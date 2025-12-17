@@ -4,6 +4,12 @@
 
 use crate::error::{OxideVaultError, Result};
 use std::env;
+use std::fs;
+use std::path::Path;
+use url::Url;
+
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 
 /// Configuration for the application, loaded from environment variables.
 #[derive(Debug, Clone)]
@@ -68,6 +74,9 @@ impl Config {
         // Where we publish downloadable backups (defaults to /backups/public)
         let backup_publish_root = env::var("BACKUP_PUBLISH_ROOT").unwrap_or_else(|_| "/backups/public".to_string());
         Self::validate_publish_root(&backup_publish_root)?;
+        
+        // Check if backup_folder and backup_publish_root are on different filesystems and warn if so
+        Self::check_filesystem_compatibility(&backup_folder, &backup_publish_root);
 
         // Public URL base (must match your reverse proxy, e.g., https://drop.example.com/backups)
         let backup_public_base_url = env::var("BACKUP_PUBLIC_BASE_URL")
@@ -127,8 +136,6 @@ impl Config {
 
     /// Validate that the backup folder path exists and is a directory.
     fn validate_backup_folder(path: &str) -> Result<()> {
-        use std::path::Path;
-
         let backup_path = Path::new(path);
 
         if !backup_path.is_absolute() {
@@ -154,9 +161,6 @@ impl Config {
 
     /// Validate that the publish root exists (or create it) and is a directory.
     fn validate_publish_root(path: &str) -> Result<()> {
-        use std::path::Path;
-        use std::fs;
-
         let publish_path = Path::new(path);
 
         if !publish_path.is_absolute() {
@@ -180,14 +184,69 @@ impl Config {
         Ok(())
     }
 
-    /// Validate the public base URL format (simple check).
-    fn validate_public_base_url(url: &str) -> Result<()> {
-        if !(url.starts_with("http://") || url.starts_with("https://")) {
+    /// Validate the public base URL format using proper URL parsing.
+    fn validate_public_base_url(url_str: &str) -> Result<()> {
+        // Parse the URL to validate its structure
+        let parsed_url = Url::parse(url_str)
+            .map_err(|e| OxideVaultError::Config(
+                format!("Invalid BACKUP_PUBLIC_BASE_URL '{}': {}", url_str, e)
+            ))?;
+        
+        // Ensure it's HTTP or HTTPS
+        let scheme = parsed_url.scheme();
+        if scheme != "http" && scheme != "https" {
             return Err(OxideVaultError::Config(
-                format!("BACKUP_PUBLIC_BASE_URL must start with http:// or https://, got: '{}'", url)
+                format!("BACKUP_PUBLIC_BASE_URL must use http:// or https:// scheme, got: '{}'", scheme)
             ));
         }
+        
+        // Ensure it has a host
+        if parsed_url.host_str().is_none() {
+            return Err(OxideVaultError::Config(
+                format!("BACKUP_PUBLIC_BASE_URL must contain a valid host: '{}'", url_str)
+            ));
+        }
+        
         Ok(())
+    }
+    
+    /// Check if backup_folder and backup_publish_root are on different filesystems
+    /// and warn if so (hard linking will fail and fall back to copying).
+    fn check_filesystem_compatibility(backup_folder: &str, publish_root: &str) {
+        let backup_path = Path::new(backup_folder);
+        let publish_path = Path::new(publish_root);
+        
+        // Check if publish_root is under backup_folder (likely same filesystem)
+        if publish_path.starts_with(backup_path) {
+            return; // Likely same filesystem
+        }
+        
+        // On Unix systems, we can check device IDs to determine if paths are on the same filesystem
+        #[cfg(unix)]
+        {
+            if let (Ok(backup_meta), Ok(publish_meta)) = (
+                std::fs::metadata(backup_path),
+                std::fs::metadata(publish_path),
+            ) {
+                if backup_meta.dev() != publish_meta.dev() {
+                    eprintln!(
+                        "Warning: BACKUP_FOLDER ('{}') and BACKUP_PUBLISH_ROOT ('{}') appear to be on different filesystems. \
+                        Hard linking will fail and backups will be copied instead, which may be slower for large files.",
+                        backup_folder, publish_root
+                    );
+                }
+            }
+        }
+        
+        // On non-Unix systems, just warn if they're not in a parent-child relationship
+        #[cfg(not(unix))]
+        {
+            eprintln!(
+                "Note: BACKUP_FOLDER ('{}') and BACKUP_PUBLISH_ROOT ('{}') are in different directories. \
+                If they're on different filesystems, hard linking will fail and backups will be copied instead.",
+                backup_folder, publish_root
+            );
+        }
     }
 }
 

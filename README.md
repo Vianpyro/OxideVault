@@ -45,11 +45,11 @@ Check the project files and comments for guidance. You can expand this section a
 
 Contributions are welcome! Feel free to open issues, submit pull requests, or suggest improvements.
 
-## 🔒 Sauvegardes via lien HTTPS
+## 🔒 Backups via HTTPS Links
 
-Le bot ne pousse plus les backups sur Discord. Il publie le fichier le plus récent dans un dossier tokenisé, servi par votre reverse-proxy (ex: Caddy), puis envoie l’URL et les commandes de téléchargement.
+The bot no longer pushes backups to Discord. Instead, it publishes the most recent backup file to a tokenized directory, served by your reverse proxy (e.g., Caddy), and sends the download URL and commands.
 
-Variables d’environnement (défauts pensés pour un volume Docker monté sur `/backups`) :
+Environment variables (defaults designed for a Docker volume mounted at `/backups`):
 
 ```bash
 BACKUP_FOLDER=/backups
@@ -57,24 +57,24 @@ BACKUP_PUBLISH_ROOT=/backups/public
 BACKUP_PUBLIC_BASE_URL=https://drop.example.com/backups
 ```
 
-Exemple de flux :
-1. Le bot crée `/backups/public/<token>/mon_backup.tgz` (hard-link si possible, sinon copie).
-2. Caddy sert `/backups/public` sur `https://drop.example.com/backups`.
-3. Le bot envoie `https://drop.example.com/backups/<token>/mon_backup.tgz` et les commandes `curl` / `Invoke-WebRequest`.
+Example workflow:
+1. The bot creates `/backups/public/<token>/my_backup.tgz` (hard-linked if possible, otherwise copied).
+2. Caddy serves `/backups/public` at `https://drop.example.com/backups`.
+3. The bot sends `https://drop.example.com/backups/<token>/my_backup.tgz` with `curl` / `Invoke-WebRequest` commands.
 
-### Exemple Caddy (HTTPS + option Basic Auth)
+### Example Caddy Configuration (HTTPS + optional Basic Auth)
 
 ```caddyfile
 drop.example.com {
   root * /backups/public
-  file_server browse
+  file_server
 
-  # Facultatif : auth basique
+  # Optional: Basic authentication
   basicauth /* {
     user JDJhJDEwJHVkL1Y2d3pzZk5IUUV0ZThQcnA0TTQuU3g0dC52cWlvUmFrZDFYOHhHTlFaQ2lUSmFwRE5v
   }
 
-  # Sécurité minimale
+  # Minimal security headers
   header /* {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
@@ -82,14 +82,15 @@ drop.example.com {
 }
 ```
 
-## 📡 PairDrop (auto-hébergé)
+**Security Note**: Do NOT enable `browse` directive on the file_server, as this would allow anyone to list and access all tokenized backup directories without needing the individual tokens.
 
-PairDrop est pratique pour des transferts ponctuels entre navigateurs. Le bot ne peut pas publier automatiquement via PairDrop (WebRTC côté navigateur), mais vous pouvez :
+## 📡 PairDrop (Self-hosted)
 
-1. Faire tourner PairDrop sur votre LAN derrière Caddy (HTTPS).
-2. Restreindre l’accès : LAN seulement, ou Basic Auth/IP allowlist.
-3. Utiliser PairDrop manuellement pour des échanges ad-hoc ; pour les backups du bot, préférez le lien HTTPS décrit plus haut.
+PairDrop is useful for ad-hoc transfers between browsers. The bot cannot automatically publish via PairDrop (WebRTC browser-side), but you can:
 
+1. Run PairDrop on your LAN behind Caddy (HTTPS).
+2. Restrict access: LAN only, or Basic Auth/IP allowlist.
+3. Use PairDrop manually for ad-hoc exchanges; for bot backups, prefer the HTTPS link described above.
 ## 📝 License
 
 Specify your license here (if any). For example: MIT, Apache 2.0, etc.
