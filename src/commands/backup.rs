@@ -223,7 +223,7 @@ fn publish_backup(
         .ok_or("Invalid file name")?;
 
     // Generate a random 12-character token for obfuscation and easy revocation
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
     let token: String = (0..12)
         .map(|_| {
             let idx = rng.gen_range(0..ALPHANUMERIC.len());
