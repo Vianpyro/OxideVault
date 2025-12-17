@@ -4,8 +4,14 @@
 
 use crate::error::{OxideVaultError, Result};
 use std::env;
+use std::fs;
+use std::path::Path;
+use url::Url;
 
-/// Application configuration loaded from environment variables.
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+
+/// Configuration for the application, loaded from environment variables.
 #[derive(Debug, Clone)]
 pub struct Config {
     /// Discord bot token
@@ -14,8 +20,12 @@ pub struct Config {
     pub db_path: String,
     /// Minecraft server address (host:port)
     pub mc_server_address: String,
-    /// Backup folder path
+    /// Path to the directory containing backup files
     pub backup_folder: String,
+    /// Directory where backups are published for download (served by reverse proxy)
+    pub backup_publish_root: String,
+    /// Public URL base where published backups are served (must match reverse proxy)
+    pub backup_public_base_url: String,
 }
 
 impl Config {
@@ -55,19 +65,31 @@ impl Config {
         // Validate server address format
         Self::validate_server_address(&mc_server_address)?;
 
-        let backup_folder = env::var("BACKUP_FOLDER")
-            .map_err(|_| OxideVaultError::Config(
-                "Missing BACKUP_FOLDER environment variable. Set it in your environment or .env file (e.g., BACKUP_FOLDER=/path/to/backups).".to_string()
-            ))?;
+        // Use /backups as the default when running in Docker unless overridden
+        let backup_folder = env::var("BACKUP_FOLDER").unwrap_or_else(|_| "/backups".to_string());
 
-        // Validate backup folder path
+        // Validate backup folder path (will error if the path is not absolute, missing, or not a directory)
         Self::validate_backup_folder(&backup_folder)?;
+
+        // Where we publish downloadable backups (defaults to /backups/public)
+        let backup_publish_root = env::var("BACKUP_PUBLISH_ROOT").unwrap_or_else(|_| "/backups/public".to_string());
+        Self::validate_publish_root(&backup_publish_root)?;
+        
+        // Check if backup_folder and backup_publish_root are on different filesystems and warn if so
+        Self::check_filesystem_compatibility(&backup_folder, &backup_publish_root);
+
+        // Public URL base (must match your reverse proxy, e.g., https://drop.example.com/backups)
+        let backup_public_base_url = env::var("BACKUP_PUBLIC_BASE_URL")
+            .unwrap_or_else(|_| "http://localhost/backups".to_string());
+        Self::validate_public_base_url(&backup_public_base_url)?;
 
         Ok(Self {
             discord_token,
             db_path,
             mc_server_address,
             backup_folder,
+            backup_publish_root,
+            backup_public_base_url,
         })
     }
 
@@ -114,29 +136,117 @@ impl Config {
 
     /// Validate that the backup folder path exists and is a directory.
     fn validate_backup_folder(path: &str) -> Result<()> {
-        use std::path::Path;
-        
         let backup_path = Path::new(path);
-        
+
         if !backup_path.is_absolute() {
             return Err(OxideVaultError::Config(
                 format!("BACKUP_FOLDER must be an absolute path, got: '{}'", path)
             ));
         }
-        
+
         if !backup_path.exists() {
             return Err(OxideVaultError::Config(
                 format!("BACKUP_FOLDER path does not exist: '{}'", path)
             ));
         }
-        
+
         if !backup_path.is_dir() {
             return Err(OxideVaultError::Config(
                 format!("BACKUP_FOLDER path is not a directory: '{}'", path)
             ));
         }
+
+        Ok(())
+    }
+
+    /// Validate that the publish root exists (or create it) and is a directory.
+    fn validate_publish_root(path: &str) -> Result<()> {
+        let publish_path = Path::new(path);
+
+        if !publish_path.is_absolute() {
+            return Err(OxideVaultError::Config(
+                format!("BACKUP_PUBLISH_ROOT must be an absolute path, got: '{}'", path)
+            ));
+        }
+
+        if !publish_path.exists() {
+            fs::create_dir_all(publish_path).map_err(|e| OxideVaultError::Config(
+                format!("Failed to create BACKUP_PUBLISH_ROOT '{}': {}", path, e)
+            ))?;
+        }
+
+        if !publish_path.is_dir() {
+            return Err(OxideVaultError::Config(
+                format!("BACKUP_PUBLISH_ROOT is not a directory: '{}'", path)
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Validate the public base URL format using proper URL parsing.
+    fn validate_public_base_url(url_str: &str) -> Result<()> {
+        // Parse the URL to validate its structure
+        let parsed_url = Url::parse(url_str)
+            .map_err(|e| OxideVaultError::Config(
+                format!("Invalid BACKUP_PUBLIC_BASE_URL '{}': {}", url_str, e)
+            ))?;
+        
+        // Ensure it's HTTP or HTTPS
+        let scheme = parsed_url.scheme();
+        if scheme != "http" && scheme != "https" {
+            return Err(OxideVaultError::Config(
+                format!("BACKUP_PUBLIC_BASE_URL must use http:// or https:// scheme, got: '{}'", scheme)
+            ));
+        }
+        
+        // Ensure it has a host
+        if parsed_url.host_str().is_none() {
+            return Err(OxideVaultError::Config(
+                format!("BACKUP_PUBLIC_BASE_URL must contain a valid host: '{}'", url_str)
+            ));
+        }
         
         Ok(())
+    }
+    
+    /// Check if backup_folder and backup_publish_root are on different filesystems
+    /// and warn if so (hard linking will fail and fall back to copying).
+    fn check_filesystem_compatibility(backup_folder: &str, publish_root: &str) {
+        let backup_path = Path::new(backup_folder);
+        let publish_path = Path::new(publish_root);
+        
+        // Check if publish_root is under backup_folder (likely same filesystem)
+        if publish_path.starts_with(backup_path) {
+            return; // Likely same filesystem
+        }
+        
+        // On Unix systems, we can check device IDs to determine if paths are on the same filesystem
+        #[cfg(unix)]
+        {
+            if let (Ok(backup_meta), Ok(publish_meta)) = (
+                std::fs::metadata(backup_path),
+                std::fs::metadata(publish_path),
+            ) {
+                if backup_meta.dev() != publish_meta.dev() {
+                    eprintln!(
+                        "Warning: BACKUP_FOLDER ('{}') and BACKUP_PUBLISH_ROOT ('{}') appear to be on different filesystems. \
+                        Hard linking will fail and backups will be copied instead, which may be slower for large files.",
+                        backup_folder, publish_root
+                    );
+                }
+            }
+        }
+        
+        // On non-Unix systems, just warn if they're not in a parent-child relationship
+        #[cfg(not(unix))]
+        {
+            eprintln!(
+                "Note: BACKUP_FOLDER ('{}') and BACKUP_PUBLISH_ROOT ('{}') are in different directories. \
+                If they're on different filesystems, hard linking will fail and backups will be copied instead.",
+                backup_folder, publish_root
+            );
+        }
     }
 }
 

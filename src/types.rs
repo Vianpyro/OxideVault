@@ -24,6 +24,10 @@ pub struct Data {
     pub last_backup_time: Arc<RwLock<HashMap<u64, Instant>>>,
     /// Global rate limiter: tracks last backup time (any user)
     pub last_global_backup_time: Arc<RwLock<Option<Instant>>>,
+    /// Folder where downloadable backups are published (served by reverse proxy)
+    pub backup_publish_root: String,
+    /// Public base URL where published backups are accessible
+    pub backup_public_base_url: String,
 }
 
 impl Data {
