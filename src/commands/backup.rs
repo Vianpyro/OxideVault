@@ -276,6 +276,19 @@ mod tests {
         assert_eq!(result.unwrap().file_name().unwrap(), expected_name);
     }
 
+    /// Helper to set up common test fixtures for publish_backup tests.
+    fn setup_publish_test() -> (TempDir, String, String) {
+        let temp_dir = TempDir::new().unwrap();
+        let publish_root = temp_dir.path().join("public");
+        let base_url = "http://example.com/backups".to_string();
+
+        // Create a sample backup file
+        let file_path = temp_dir.path().join("backup1.tgz");
+        fs::write(&file_path, b"test data").unwrap();
+
+        (temp_dir, publish_root.to_str().unwrap().to_string(), base_url)
+    }
+
     #[test]
     fn test_find_most_recent_backup_empty_folder() {
         let temp_dir = TempDir::new().unwrap();
@@ -335,15 +348,10 @@ mod tests {
 
     #[test]
     fn test_publish_backup_creates_tokenized_copy() {
-        let temp_dir = TempDir::new().unwrap();
-        let publish_root = temp_dir.path().join("public");
-        let base_url = "http://example.com/backups";
-
-        // Create a sample backup file
+        let (temp_dir, publish_root, base_url) = setup_publish_test();
         let file_path = temp_dir.path().join("backup1.tgz");
-        fs::write(&file_path, b"test data").unwrap();
 
-        let result = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url);
+        let result = publish_backup(&file_path, &publish_root, &base_url);
         assert!(result.is_ok());
 
         let published = result.unwrap();
@@ -357,31 +365,24 @@ mod tests {
 
     #[test]
     fn test_publish_backup_invalid_file() {
-        let temp_dir = TempDir::new().unwrap();
-        let publish_root = temp_dir.path().join("public");
-        let base_url = "http://example.com/backups";
+        let (temp_dir, publish_root, base_url) = setup_publish_test();
 
         // Try to publish a non-existent file
         let file_path = temp_dir.path().join("nonexistent.tgz");
 
-        let result = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url);
+        let result = publish_backup(&file_path, &publish_root, &base_url);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_publish_backup_token_uniqueness() {
-        let temp_dir = TempDir::new().unwrap();
-        let publish_root = temp_dir.path().join("public");
-        let base_url = "http://example.com/backups";
-
-        // Create a sample backup file
+        let (temp_dir, publish_root, base_url) = setup_publish_test();
         let file_path = temp_dir.path().join("backup1.tgz");
-        fs::write(&file_path, b"test data").unwrap();
 
         // Publish multiple times and ensure tokens are different
-        let result1 = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url).unwrap();
-        let result2 = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url).unwrap();
-        let result3 = publish_backup(&file_path, publish_root.to_str().unwrap(), base_url).unwrap();
+        let result1 = publish_backup(&file_path, &publish_root, &base_url).unwrap();
+        let result2 = publish_backup(&file_path, &publish_root, &base_url).unwrap();
+        let result3 = publish_backup(&file_path, &publish_root, &base_url).unwrap();
 
         assert_ne!(result1.url, result2.url, "Tokens should be unique");
         assert_ne!(result1.url, result3.url, "Tokens should be unique");
