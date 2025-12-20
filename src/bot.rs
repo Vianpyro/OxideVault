@@ -4,7 +4,7 @@
 //! including command registration and framework initialization.
 
 use crate::types::Data;
-use crate::commands::{ping, uuid, online, backup};
+use crate::commands::{ping, uuid, online, draw, backup};
 use crate::database;
 use crate::config::Config;
 use poise::serenity_prelude as serenity;
@@ -35,7 +35,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![ping(), uuid(), online(), backup()],
+            commands: vec![ping(), uuid(), online(), draw(), backup()],
             ..Default::default()
         })
         .setup(move |context, _ready, framework| {
