@@ -4,10 +4,13 @@
 //! including command registration and framework initialization.
 
 use crate::types::Data;
-use crate::commands::{ping, uuid, online, draw};
+use crate::commands::{ping, uuid, online, draw, backup};
 use crate::database;
 use crate::config::Config;
 use poise::serenity_prelude as serenity;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use std::collections::HashMap;
 
 /// Run the Discord bot.
 ///
@@ -32,16 +35,28 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![ping(), uuid(), online(), draw()],
+            commands: vec![ping(), uuid(), online(), draw(), backup()],
             ..Default::default()
         })
         .setup(move |context, _ready, framework| {
             let db_path = config.db_path.clone();
             let http_client = http_client.clone();
             let mc_server_address = config.mc_server_address.clone();
+            let backup_folder = config.backup_folder.clone();
+            let backup_publish_root = config.backup_publish_root.clone();
+            let backup_public_base_url = config.backup_public_base_url.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(context, &framework.options().commands).await?;
-                Ok(Data { db_path, http_client, mc_server_address })
+                Ok(Data {
+                    db_path,
+                    http_client,
+                    mc_server_address,
+                    backup_folder,
+                    last_backup_time: Arc::new(RwLock::new(HashMap::new())),
+                    last_global_backup_time: Arc::new(RwLock::new(None)),
+                    backup_publish_root,
+                    backup_public_base_url,
+                })
             })
         })
         .build();
