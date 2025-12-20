@@ -5,6 +5,25 @@
 
 use crate::error::{OxideVaultError, Result};
 
+/// Validate that a parameter is within the 0.0 to 1.0 range.
+///
+/// # Arguments
+///
+/// * `value` - The value to validate
+/// * `param_name` - The name of the parameter for error messages
+///
+/// # Returns
+///
+/// Returns Ok(()) if the value is valid, or an error if out of range.
+fn validate_range_0_to_1(value: f32, param_name: &str) -> Result<()> {
+    if !(0.0..=1.0).contains(&value) {
+        return Err(OxideVaultError::InvalidInput(
+            format!("{} must be between 0.0 and 1.0, got {}", param_name, value)
+        ));
+    }
+    Ok(())
+}
+
 /// Pl3xmap color settings converted to decimal format.
 #[derive(Debug, Clone)]
 pub struct Pl3xmapColors {
@@ -66,26 +85,10 @@ pub fn convert_pl3xmap_colors(
     fill_opacity: f32,
 ) -> Result<Pl3xmapColors> {
     // Validate ranges
-    if !(0.0..=1.0).contains(&saturation) {
-        return Err(OxideVaultError::InvalidInput(
-            format!("Saturation must be between 0.0 and 1.0, got {}", saturation)
-        ));
-    }
-    if !(0.0..=1.0).contains(&lightness) {
-        return Err(OxideVaultError::InvalidInput(
-            format!("Lightness must be between 0.0 and 1.0, got {}", lightness)
-        ));
-    }
-    if !(0.0..=1.0).contains(&stroke_opacity) {
-        return Err(OxideVaultError::InvalidInput(
-            format!("Stroke opacity must be between 0.0 and 1.0, got {}", stroke_opacity)
-        ));
-    }
-    if !(0.0..=1.0).contains(&fill_opacity) {
-        return Err(OxideVaultError::InvalidInput(
-            format!("Fill opacity must be between 0.0 and 1.0, got {}", fill_opacity)
-        ));
-    }
+    validate_range_0_to_1(saturation, "Saturation")?;
+    validate_range_0_to_1(lightness, "Lightness")?;
+    validate_range_0_to_1(stroke_opacity, "Stroke opacity")?;
+    validate_range_0_to_1(fill_opacity, "Fill opacity")?;
 
     // Convert saturation and lightness to 0-255 range
     let saturation_decimal = (saturation * 255.0).round() as u8;
@@ -135,15 +138,15 @@ fn parse_hex_to_argb(hex: &str, opacity: f32) -> Result<u32> {
     // Parse RGB components
     let r = u8::from_str_radix(&hex[0..2], 16)
         .map_err(|_| OxideVaultError::InvalidInput(
-            format!("Invalid hex color: {}", hex)
+            format!("Invalid hex color (red component): {}", hex)
         ))?;
     let g = u8::from_str_radix(&hex[2..4], 16)
         .map_err(|_| OxideVaultError::InvalidInput(
-            format!("Invalid hex color: {}", hex)
+            format!("Invalid hex color (green component): {}", hex)
         ))?;
     let b = u8::from_str_radix(&hex[4..6], 16)
         .map_err(|_| OxideVaultError::InvalidInput(
-            format!("Invalid hex color: {}", hex)
+            format!("Invalid hex color (blue component): {}", hex)
         ))?;
 
     // Convert opacity to alpha (0-255)
@@ -153,6 +156,33 @@ fn parse_hex_to_argb(hex: &str, opacity: f32) -> Result<u32> {
     let argb = ((a as u32) << 24) | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
 
     Ok(argb)
+}
+
+/// Validate a hex color string without opacity.
+///
+/// # Arguments
+///
+/// * `hex` - Hex color string (e.g., "FF5733" or "#FF5733")
+///
+/// # Returns
+///
+/// Returns Ok(()) if the hex string is valid, or an error if invalid.
+///
+/// # Examples
+///
+/// ```no_run
+/// use oxidevault::pl3xmap::validate_hex_color;
+///
+/// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// validate_hex_color("FF5733")?;  // Valid
+/// validate_hex_color("#00AAFF")?; // Valid with # prefix
+/// # Ok(())
+/// # }
+/// ```
+pub fn validate_hex_color(hex: &str) -> Result<()> {
+    // Use parse_hex_to_argb with a dummy opacity to validate
+    parse_hex_to_argb(hex, 1.0)?;
+    Ok(())
 }
 
 #[cfg(test)]

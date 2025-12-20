@@ -44,7 +44,14 @@ impl fmt::Display for OxideVaultError {
     }
 }
 
-impl std::error::Error for OxideVaultError {}
+impl std::error::Error for OxideVaultError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            OxideVaultError::Io(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 
 // Implement From traits for automatic error conversion
 impl From<std::io::Error> for OxideVaultError {

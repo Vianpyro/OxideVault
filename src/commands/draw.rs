@@ -5,6 +5,7 @@
 //! representation to the console.
 
 use crate::types::{Context, Error};
+use crate::pl3xmap;
 use serde_json::json;
 use std::env;
 
@@ -42,8 +43,18 @@ pub async fn draw(
     }
 
     // Validate radius
+    const MAX_RADIUS: i32 = 10000; // Maximum reasonable radius
     if radius <= 0 {
         context.say("❌ Radius must be a positive integer.").await?;
+        return Ok(());
+    }
+    if radius > MAX_RADIUS {
+        context
+            .say(format!(
+                "❌ Radius is too large. Maximum allowed: {}",
+                MAX_RADIUS
+            ))
+            .await?;
         return Ok(());
     }
 
@@ -59,14 +70,16 @@ pub async fn draw(
     let stroke = parts[0];
     let fill = parts[1];
 
-    fn valid_hex6(s: &str) -> bool {
-        if s.len() != 6 { return false; }
-        s.chars().all(|c| c.is_ascii_hexdigit())
-    }
-
-    if !valid_hex6(stroke) || !valid_hex6(fill) {
+    // Validate hex colors using pl3xmap module
+    if let Err(e) = pl3xmap::validate_hex_color(stroke) {
         context
-            .say("❌ Colors must be 6-character hex RGB values (0-9, A-F).")
+            .say(format!("❌ Invalid stroke color: {}", e))
+            .await?;
+        return Ok(());
+    }
+    if let Err(e) = pl3xmap::validate_hex_color(fill) {
+        context
+            .say(format!("❌ Invalid fill color: {}", e))
             .await?;
         return Ok(());
     }
@@ -84,34 +97,22 @@ pub async fn draw(
         }};
     }
 
-    let min_x = match read_bound!("DRAW_MIN_X") {
-        Ok(v) => v,
-        Err(e) => {
-            context.say(format!("❌ {}", e)).await?;
-            return Ok(());
-        }
-    };
-    let max_x = match read_bound!("DRAW_MAX_X") {
-        Ok(v) => v,
-        Err(e) => {
-            context.say(format!("❌ {}", e)).await?;
-            return Ok(());
-        }
-    };
-    let min_y = match read_bound!("DRAW_MIN_Y") {
-        Ok(v) => v,
-        Err(e) => {
-            context.say(format!("❌ {}", e)).await?;
-            return Ok(());
-        }
-    };
-    let max_y = match read_bound!("DRAW_MAX_Y") {
-        Ok(v) => v,
-        Err(e) => {
-            context.say(format!("❌ {}", e)).await?;
-            return Ok(());
-        }
-    };
+    macro_rules! read_and_report_bound {
+        ($ctx:expr, $name:expr) => {{
+            match read_bound!($name) {
+                Ok(v) => v,
+                Err(e) => {
+                    $ctx.say(format!("❌ {}", e)).await?;
+                    return Ok(());
+                }
+            }
+        }};
+    }
+
+    let min_x = read_and_report_bound!(context, "DRAW_MIN_X");
+    let max_x = read_and_report_bound!(context, "DRAW_MAX_X");
+    let min_y = read_and_report_bound!(context, "DRAW_MIN_Y");
+    let max_y = read_and_report_bound!(context, "DRAW_MAX_Y");
 
     if x < min_x || x > max_x {
         context
@@ -143,7 +144,7 @@ pub async fn draw(
         "fill": fill,
     });
 
-    println!("[draw] {}", obj.to_string());
+    eprintln!("[draw] {}", obj.to_string());
 
     context.say("✅ Draw JSON logged to console.").await?;
 

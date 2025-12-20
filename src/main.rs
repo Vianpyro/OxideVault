@@ -12,6 +12,7 @@ mod database;
 mod commands;
 mod bot;
 mod mc_server;
+mod pl3xmap;
 mod utils;
 
 #[tokio::main]
